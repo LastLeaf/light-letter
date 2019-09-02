@@ -1,0 +1,17 @@
+[package]
+name = "light_letter"
+version = "0.1.0"
+authors = ["LastLeaf <bqfu@163.com>"]
+edition = "2018"
+
+[lib]
+path = "src/main.rs"
+
+[[bin]]
+name = "light-letter"
+path = "src/main.rs"
+
+[dependencies]
+actix-web = "1.0"
+serde = "1.0"
+toml = "0.5"

@@ -1,0 +1,10 @@
+[net]
+port = 2180
+
+[[site]]
+name = "local-1"
+host = "localhost"
+
+[[site]]
+name = "local-2"
+host = "127.0.0.1"
