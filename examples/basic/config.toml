@@ -1,10 +1,20 @@
 [net]
-port = 2180
+ip = "127.0.0.1"
+port = [2180, 2280]
+
+[db]
+username = "light_letter"
+password = "light_letter"
 
 [[site]]
 name = "local-1"
-host = "localhost"
+database = "light_letter_local_1"
+type = "blog"
+host = "localhost:2180"
 
 [[site]]
 name = "local-2"
-host = "127.0.0.1"
+type = "static"
+database = "light_letter_local_2"
+host = "127.0.0.1:2180"
+alias = ["127.0.0.1:2280"]

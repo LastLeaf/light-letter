@@ -1,21 +1,34 @@
 use std::path::Path;
 use serde::Deserialize;
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 pub(crate) struct SitesConfig {
     pub(crate) net: NetConfig,
+    pub(crate) db: Option<DbConfig>,
     pub(crate) site: Vec<SiteConfig>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 pub(crate) struct NetConfig {
-    pub(crate) port: u16,
+    pub(crate) ip: String,
+    pub(crate) port: Vec<u16>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
+pub(crate) struct DbConfig {
+    pub(crate) host: Option<String>,
+    pub(crate) port: Option<u16>,
+    pub(crate) username: String,
+    pub(crate) password: String,
+}
+
+#[derive(Clone, Debug, Deserialize)]
 pub(crate) struct SiteConfig {
     pub(crate) name: String,
+    pub(crate) r#type: String,
+    pub(crate) database: Option<String>,
     pub(crate) host: String,
+    pub(crate) alias: Option<Vec<String>>,
 }
 
 pub(crate) fn read_sites_config(sites_root: &Path) -> SitesConfig {
