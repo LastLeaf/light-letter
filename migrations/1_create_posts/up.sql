@@ -1,3 +1,10 @@
+CREATE TABLE users (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  email TEXT,
+  description TEXT,
+);
+
 CREATE TABLE categories (
   id UUID PRIMARY KEY,
   name TEXT NOT NULL,

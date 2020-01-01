@@ -19,6 +19,7 @@ const SITES_CONFIG: &'static str = r#"
 
     [[site]]
     name = "local-2"
+    database = "light_letter_local_2"
     type = "static"
     host = "127.0.0.1:2180"
 "#;

@@ -1,9 +1,8 @@
 use std::net::SocketAddr;
 use std::path::{Path, PathBuf, Component};
-use actix_web::{web, http, App, HttpRequest, HttpResponse, HttpServer, guard};
+use actix_web::{web, middleware, http, App, HttpRequest, HttpResponse, HttpServer, guard};
 use actix_files::NamedFile;
 use failure::Fail;
-use futures::future::Future;
 use regex::Regex;
 
 pub(crate) struct Server {
@@ -38,8 +37,7 @@ impl actix_web::error::ResponseError for HttpError {
 
 macro_rules! serve_dir {
     ($rule: ident, $path: expr) => {
-        fn $rule(req: HttpRequest) -> actix_web::Result<NamedFile, HttpError> {
-            let site_state: &SiteState = req.app_data().unwrap();
+        async fn $rule(site_state: web::Data<SiteState>, req: HttpRequest) -> actix_web::Result<NamedFile, HttpError> {
             let path: PathBuf = req.match_info().query("filename").parse().unwrap();
             for slice in path.components() {
                 if let Component::Normal(_) = slice {
@@ -61,8 +59,7 @@ macro_rules! serve_dir {
 serve_dir!(serve_static, "static");
 serve_dir!(serve_files, "files");
 
-fn host_alias_redirect(req: HttpRequest) -> HttpResponse {
-    let site_state: &SiteState = req.app_data().unwrap();
+fn host_alias_redirect(site_state: web::Data<SiteState>, req: HttpRequest) -> HttpResponse {
     let ori_uri = req.uri();
     let uri = format!("//{}{}", site_state.host, ori_uri.path_and_query().map(|x| x.to_string()).unwrap_or("".into()));
     HttpResponse::Found()
@@ -112,7 +109,8 @@ impl Server {
 
         // create http server
         let mut http_server = HttpServer::new(move || {
-            let mut app = App::new();
+            let mut app = App::new()
+                .wrap(middleware::Compress::default());
             for site_state in site_states.clone() {
                 let scope = web::scope("")
                     .guard(guard::Header("Host", site_state.host))
@@ -121,6 +119,7 @@ impl Server {
                 let routes = match site_type.as_str() {
                     "blog" => {
                         let scope = scope.route("/files/{filename:.*}", web::get().to(serve_files));
+                        let scope = super::blog::route(scope);
                         scope
                     },
                     "static" => {
@@ -145,7 +144,7 @@ impl Server {
 
         Self {
             addrs: http_server.addrs(),
-            http_server: http_server.start(),
+            http_server: http_server.run(),
         }
     }
 
@@ -154,6 +153,6 @@ impl Server {
     }
 
     pub(crate) fn stop(&mut self, graceful: bool) {
-        self.http_server.stop(graceful).wait().unwrap();
+        futures::executor::block_on(self.http_server.stop(graceful));
     }
 }
