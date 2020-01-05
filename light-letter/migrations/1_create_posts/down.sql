@@ -1,3 +1,5 @@
+DROP TABLE users;
+
 DROP TABLE post_tags;
 
 DROP TABLE posts;
