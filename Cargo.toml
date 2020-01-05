@@ -1,38 +1,8 @@
-[package]
-name = "light_letter"
-version = "0.1.0"
-authors = ["LastLeaf <bqfu@163.com>"]
-edition = "2018"
+[workspace]
+members = [
+    "light-letter",
+    "light-letter-web",
+]
 
-[lib]
-name = "light_letter"
-path = "src/lib.rs"
-
-[[bin]]
-name = "light-letter"
-path = "src/main.rs"
-
-[dependencies]
-url = "2.1"
-actix-rt = "1.0"
-actix-web = "2.0"
-actix-files = "0.2"
-futures = "0.3"
-serde = "1.0"
-toml = "0.5"
-fs_extra = "1.1"
-failure = "0.1"
-regex = "1.2"
-lazy_static = "1.0"
-log = "0.4"
-env_logger = "0.6"
-diesel = { version = "1.4", features = ["postgres", "uuid", "r2d2"] }
-diesel_migrations = "1.4"
-diesel_derives = "1.4"
-base64 = "0.11"
-maomi = { version = "=0.1.0", path = "../maomi/maomi" }
-wasm-bindgen = "0.2"
-console_log = "0.1"
-
-[dev-dependencies]
-tempdir = "0.3"
+[profile.release]
+opt-level = "s"

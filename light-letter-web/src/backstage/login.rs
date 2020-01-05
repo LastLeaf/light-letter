@@ -16,7 +16,7 @@ impl<B: Backend> Component<B> for HelloWorld {
         }
     }
 }
-impl<B: Backend> PrerenderableComponent<'_, B> for HelloWorld {
+impl<B: Backend> PrerenderableComponent<B> for HelloWorld {
     type PrerenderedData = String;
     fn get_prerendered_data(&self) -> std::pin::Pin<Box<dyn futures::Future<Output = Self::PrerenderedData>>> {
         Box::pin(futures::future::ready("PRERENDER".into()))

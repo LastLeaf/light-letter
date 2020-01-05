@@ -5,6 +5,8 @@ use actix_files::NamedFile;
 use failure::Fail;
 use regex::Regex;
 
+mod blog;
+
 pub(crate) struct Server {
     addrs: Vec<SocketAddr>,
     http_server: actix_web::dev::Server,
@@ -119,7 +121,8 @@ impl Server {
                 let routes = match site_type.as_str() {
                     "blog" => {
                         let scope = scope.route("/files/{filename:.*}", web::get().to(serve_files));
-                        let scope = super::blog::route(scope);
+                        let scope = scope.route("/rpc/{method:.*}", web::post().to(blog::rpc));
+                        let scope = scope.route("/{path:.*}", web::get().to(blog::page));
                         scope
                     },
                     "static" => {

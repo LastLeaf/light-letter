@@ -9,7 +9,6 @@ mod sites_config;
 use sites_config::*;
 mod http;
 use http::SiteState;
-mod blog;
 mod db;
 mod schema;
 mod models;
