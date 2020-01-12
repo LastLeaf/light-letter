@@ -1,11 +1,16 @@
 use maomi::prelude::*;
 
-template!(xml for HelloWorld {
-    <div style="display: inline">
+template!(xml for HelloWorld ~HELLO_WORLD {
+    <div class="hello-world">
         {&self.a}
         <slot />
     </div>
 });
+skin!(HELLO_WORLD = r#"
+    .hello-world {
+        text-align: center;
+    }
+"#);
 pub struct HelloWorld {
     pub a: String,
 }

@@ -37,6 +37,20 @@ impl actix_web::error::ResponseError for HttpError {
     }
 }
 
+macro_rules! serve_file {
+    ($rule: ident, $path: expr) => {
+        async fn $rule(site_state: web::Data<SiteState>, req: HttpRequest) -> actix_web::Result<NamedFile, HttpError> {
+            let path = site_state.dir.join($path);
+            if path.is_dir() {
+                Err(HttpError::NotFound)
+            } else {
+                NamedFile::open(path).map_err(|_| HttpError::NotFound)
+            }
+        }
+    };
+}
+serve_file!(serve_favicon, "favicon");
+
 macro_rules! serve_dir {
     ($rule: ident, $path: expr) => {
         async fn $rule(site_state: web::Data<SiteState>, req: HttpRequest) -> actix_web::Result<NamedFile, HttpError> {
@@ -120,13 +134,17 @@ impl Server {
                 let site_type = site_state.config.r#type.clone();
                 let routes = match site_type.as_str() {
                     "blog" => {
+                        let scope = scope.route("/favicon.ico", web::get().to(serve_favicon));
                         let scope = scope.route("/files/{filename:.*}", web::get().to(serve_files));
                         let scope = scope.route("/rpc/{method:.*}", web::post().to(blog::rpc));
+                        let scope = scope.route("/static/{res:.*}", web::get().to(blog::static_resource));
                         let scope = scope.route("/{path:.*}", web::get().to(blog::page));
                         scope
                     },
                     "static" => {
-                        scope.route("/{filename:.*}", web::get().to(serve_static))
+                        let scope = scope.route("/favicon.ico", web::get().to(serve_favicon));
+                        let scope = scope.route("/{filename:.*}", web::get().to(serve_static));
+                        scope
                     },
                     _ => unreachable!()
                 };
