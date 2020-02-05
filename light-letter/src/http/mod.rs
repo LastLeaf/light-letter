@@ -1,91 +1,105 @@
+use std::sync::Arc;
+use std::cell::RefCell;
 use std::net::SocketAddr;
-use std::path::{Path, PathBuf, Component};
-use actix_web::{web, middleware, http, App, HttpRequest, HttpResponse, HttpServer, guard};
-use actix_files::NamedFile;
-use failure::Fail;
+use std::path::{Path, PathBuf};
+use std::convert::Infallible;
+use tokio::sync::oneshot;
 use regex::Regex;
+use hyper::{Body, Request, Response, Server as HttpServer};
+use hyper::service::{make_service_fn, service_fn};
+use http::header::*;
 
 mod blog;
+mod res_utils;
+mod error;
 
 pub(crate) struct Server {
     addrs: Vec<SocketAddr>,
-    http_server: actix_web::dev::Server,
+    rx: Vec<oneshot::Receiver<()>>,
+    site_states: Vec<SiteState>,
 }
 
 #[derive(Clone, Debug)]
 pub(crate) struct SiteState {
-    host: &'static str,
-    host_aliases: Vec<&'static str>,
+    initialization_time: chrono::DateTime<chrono::Utc>,
+    host: String,
+    host_aliases: Vec<String>,
     dir: PathBuf,
     config: crate::SiteConfig,
 }
 
-#[derive(Fail, Debug)]
-enum HttpError {
-    #[fail(display = "Not Found")]
-    NotFound,
-    #[fail(display = "")]
-    Forbidden,
+struct SiteStatesWrapper {
+    s: &'static Vec<SiteState>,
 }
 
-impl actix_web::error::ResponseError for HttpError {
-    fn error_response(&self) -> HttpResponse {
-        match *self {
-            HttpError::NotFound => HttpResponse::new(http::StatusCode::NOT_FOUND),
-            HttpError::Forbidden => HttpResponse::new(http::StatusCode::FORBIDDEN),
-        }
+impl Drop for SiteStatesWrapper {
+    fn drop(&mut self) {
+        unsafe { Box::from_raw(self.s as *const Vec<SiteState> as *mut Vec<SiteState>); }
     }
 }
 
-macro_rules! serve_file {
-    ($rule: ident, $path: expr) => {
-        async fn $rule(site_state: web::Data<SiteState>, req: HttpRequest) -> actix_web::Result<NamedFile, HttpError> {
-            let path = site_state.dir.join($path);
-            if path.is_dir() {
-                Err(HttpError::NotFound)
-            } else {
-                NamedFile::open(path).map_err(|_| HttpError::NotFound)
-            }
-        }
-    };
+async fn serve_blog(req: Request<Body>, site_state: &SiteState) -> Result<Response<Body>, Infallible> {
+    debug!("Requested {:?} {:?}, matched blog site {:?}", req.method(), req.uri(), site_state.host);
+    let path = req.uri().path();
+    let dir = &site_state.dir;
+    if path == "/favicon.ico" {
+        Ok(res_utils::file(&req, dir, "favicon.ico").await)
+    } else {
+        let mut p = path[1..].splitn(2, '/');
+        let scope = p.next().unwrap_or("");
+        let sub_path = p.next().unwrap_or("");
+        let ret = match scope {
+            "files" => res_utils::file(&req, &dir.join("files"), sub_path).await,
+            "static" => blog::static_resource(&req, sub_path, &site_state.initialization_time),
+            "rpc" => blog::rpc(site_state, &req, sub_path).await,
+            _ => blog::page(site_state, &req).await,
+        };
+        Ok(ret)
+    }
 }
-serve_file!(serve_favicon, "favicon");
 
-macro_rules! serve_dir {
-    ($rule: ident, $path: expr) => {
-        async fn $rule(site_state: web::Data<SiteState>, req: HttpRequest) -> actix_web::Result<NamedFile, HttpError> {
-            let path: PathBuf = req.match_info().query("filename").parse().unwrap();
-            for slice in path.components() {
-                if let Component::Normal(_) = slice {
-                    // empty
-                } else {
-                    return Err(HttpError::Forbidden)
-                }
-            }
-            let path = site_state.dir.join($path).join(path);
-            if path.is_dir() {
-                let index_path = path.join("index.html");
-                NamedFile::open(index_path.as_path()).map_err(|_| HttpError::NotFound)
-            } else {
-                NamedFile::open(path).map_err(|_| HttpError::NotFound)
-            }
-        }
-    };
+async fn serve_static(req: Request<Body>, site_state: &SiteState) -> Result<Response<Body>, Infallible> {
+    debug!("Requested {:?} {:?}, matched static site {:?}", req.method(), req.uri(), site_state.host);
+    let path = &req.uri().path()[1..];
+    let dir = &site_state.dir;
+    let ret = res_utils::file(&req, &dir.join("static"), path).await;
+    Ok(ret)
 }
-serve_dir!(serve_static, "static");
-serve_dir!(serve_files, "files");
 
-fn host_alias_redirect(site_state: web::Data<SiteState>, req: HttpRequest) -> HttpResponse {
-    let ori_uri = req.uri();
-    let uri = format!("//{}{}", site_state.host, ori_uri.path_and_query().map(|x| x.to_string()).unwrap_or("".into()));
-    HttpResponse::Found()
-        .header(http::header::LOCATION, uri)
-        .finish()
-        .into_body()
+async fn serve(req: Request<Body>, site_states: &Vec<SiteState>) -> Result<Response<Body>, Infallible> {
+    let host = req.headers().get(HOST).map(|x| x.to_str().unwrap_or("")).unwrap_or("");
+
+    if let Some(site_state) = site_states.iter().find(|x| {
+        x.host == host
+    }) {
+        let site_type = site_state.config.r#type.clone();
+        return match site_type.as_str() {
+            "blog" => serve_blog(req, site_state).await,
+            "static" => serve_static(req, site_state).await,
+            _ => unreachable!()
+        };
+    }
+
+    if let Some(site_state) = site_states.iter().find(|x| {
+        x.host_aliases.iter().position(|x| {
+            *x == host
+        }).is_some()
+    }) {
+        let uri = req.uri();
+        let query = uri.query().unwrap_or("");
+        let location = format!("//{}{}{}{}", site_state.host, uri.path(), if query.len() > 0 { "?" } else { "" }, query);
+        debug!("Requested {:?} {:?}, redirecting {:?}", req.method(), req.uri(), location);
+        let response = res_utils::redirect(&req, &location);
+        return Ok(response);
+    }
+
+    warn!("Requested {:?} {:?}, no site matched", req.method(), req.uri());
+    let response = res_utils::not_found(&req);
+    Ok(response)
 }
 
 impl Server {
-    pub(crate) fn new(sites_root: &Path, config: &crate::SitesConfig) -> Self {
+    pub(crate) fn new_with_close_handler(sites_root: &Path, config: &crate::SitesConfig) -> (Self, CloseHandler) {
         let sites_root = sites_root.to_owned();
 
         // check config and initialize dir structure for each site
@@ -109,12 +123,10 @@ impl Server {
                 _ => panic!(format!(r#"Unrecognized site type "{}"."#, &site_type))
             };
             debug!(r#"Serve site {} for host "{}", aliases {:?}"#, site_config.name, site_config.host, site_config.alias.as_ref().unwrap_or(&vec![]));
-            let host = Box::leak(site_config.host.clone().into_boxed_str()); // NOTE here might cause memory leak
-            let host_aliases = site_config.alias.as_ref().unwrap_or(&vec![]).iter().map(|x| { // NOTE here might cause memory leak
-                let s: &'static str = Box::leak(x.clone().into_boxed_str());
-                s
-            }).collect();
+            let host = site_config.host.clone();
+            let host_aliases = site_config.alias.as_ref().unwrap_or(&vec![]).iter().map(|x| x.clone()).collect();
             let site_state = SiteState {
+                initialization_time: chrono::Utc::now(),
                 host,
                 host_aliases,
                 dir,
@@ -123,57 +135,81 @@ impl Server {
             site_state
         }).collect();
 
-        // create http server
-        let mut http_server = HttpServer::new(move || {
-            let mut app = App::new()
-                .wrap(middleware::Compress::default());
-            for site_state in site_states.clone() {
-                let scope = web::scope("")
-                    .guard(guard::Header("Host", site_state.host))
-                    .data(site_state.clone());
-                let site_type = site_state.config.r#type.clone();
-                let routes = match site_type.as_str() {
-                    "blog" => {
-                        let scope = scope.route("/favicon.ico", web::get().to(serve_favicon));
-                        let scope = scope.route("/files/{filename:.*}", web::get().to(serve_files));
-                        let scope = scope.route("/rpc/{method:.*}", web::post().to(blog::rpc));
-                        let scope = scope.route("/static/{res:.*}", web::get().to(blog::static_resource));
-                        let scope = scope.route("/{path:.*}", web::get().to(blog::page));
-                        scope
-                    },
-                    "static" => {
-                        let scope = scope.route("/favicon.ico", web::get().to(serve_favicon));
-                        let scope = scope.route("/{filename:.*}", web::get().to(serve_static));
-                        scope
-                    },
-                    _ => unreachable!()
-                };
-                app = app.service(routes);
-                for host_alias in site_state.host_aliases.iter() {
-                    let scope = web::scope("")
-                        .guard(guard::Header("Host", host_alias))
-                        .data(site_state.clone());
-                    let routes = scope.route("/{filename:.*}", web::to(host_alias_redirect));
-                    app = app.service(routes);
-                }
-            }
-            app
-        });
-        for port in config.net.port.iter() {
-            http_server = http_server.bind((config.net.ip.as_str(), *port)).unwrap();
+        let ip = &config.net.ip;
+        let addrs: Vec<_> = config.net.port.iter().map(|port| {
+            SocketAddr::from((ip.clone(), *port))
+        }).collect();
+
+        let (tx, rx) = config.net.port.iter().map(|_| {
+            tokio::sync::oneshot::channel::<()>()
+        }).unzip();
+
+        (Self {
+            addrs,
+            rx,
+            site_states,
+        }, CloseHandler {
+            tx
+        })
+    }
+
+    pub(crate) async fn run_async(self) {
+        let Self {mut addrs, mut rx, site_states} = self;
+        let site_states = Arc::new(site_states);
+
+        thread_local! {
+            static SITE_STATES_WRAPPER: RefCell<Option<SiteStatesWrapper>> = RefCell::new(None);
         }
 
-        Self {
-            addrs: http_server.addrs(),
-            http_server: http_server.run(),
+        let graceful: Vec<_> = addrs.iter_mut().zip(rx.iter_mut()).map(|(addr, rx)| {
+            let site_states = site_states.clone();
+            let make_svc = make_service_fn(move |_conn| {
+                let site_states = site_states.clone();
+                async move {
+                    Ok::<_, Infallible>(service_fn(move |req| {
+                        let site_states: &'static Vec<SiteState> = SITE_STATES_WRAPPER.with(|ssw| {
+                            let mut ssw = ssw.borrow_mut();
+                            if let Some(ssw) = ssw.as_ref() {
+                                let site_states: &'static Vec<SiteState> = ssw.s;
+                                site_states
+                            } else {
+                                *ssw = Some(SiteStatesWrapper { s: Box::leak(Box::new(site_states.clone())) });
+                                let site_states: &'static Vec<SiteState> = ssw.as_ref().unwrap().s;
+                                site_states
+                            }
+                        });
+                        serve(req, site_states)
+                    }))
+                }
+            });
+
+            let server = HttpServer::bind(&addr).serve(make_svc);
+            let graceful = server
+                .with_graceful_shutdown(async {
+                    rx.await.ok();
+                });
+            graceful
+        }).collect();
+
+        let all_services = futures::future::join_all(graceful);
+        for r in all_services.await {
+            r.unwrap();
         }
     }
 
     pub(crate) fn addrs(&self) -> &Vec<SocketAddr> {
         &self.addrs
     }
+}
 
-    pub(crate) fn stop(&mut self, graceful: bool) {
-        futures::executor::block_on(self.http_server.stop(graceful));
+pub(crate) struct CloseHandler {
+    tx: Vec<oneshot::Sender<()>>,
+}
+
+impl CloseHandler {
+    pub(crate) fn close(self) {
+        for tx in self.tx {
+            tx.send(()).unwrap();
+        }
     }
 }

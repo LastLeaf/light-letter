@@ -1,6 +1,6 @@
 [package]
 name = "light-letter-web"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["LastLeaf <bqfu@163.com>"]
 edition = "2018"
 
@@ -9,7 +9,7 @@ name = "light_letter_web"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-maomi = { version = "=0.1.0", path = "../../maomi/maomi" }
+maomi = { version = "=0.2.0", path = "../../maomi/maomi" }
 wasm-bindgen = "0.2"
 log = "0.4"
 console_log = "0.1"
@@ -17,3 +17,4 @@ futures = "0.3"
 base64 = "0.11"
 serde = "1.0"
 serde_urlencoded = "0.6"
+lazy_static = "1.4.0"

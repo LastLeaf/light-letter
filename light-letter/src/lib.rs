@@ -5,11 +5,13 @@
 
 use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
+use tokio::runtime::{Runtime, Builder};
+use hyper::{Body, Request, Response, Server};
+use hyper::service::{make_service_fn, service_fn};
 
 mod sites_config;
 use sites_config::*;
 mod http;
-use http::SiteState;
 mod db;
 mod schema;
 mod models;
@@ -17,8 +19,9 @@ mod models;
 /// The server builder object
 pub struct SitesServerBuilder {
     sites_root: PathBuf,
-    sys: actix_rt::SystemRunner,
-    http: http::Server,
+    tokio_runtime: Runtime,
+    http_server: http::Server,
+    close_handler: http::CloseHandler,
 }
 
 impl SitesServerBuilder {
@@ -29,48 +32,64 @@ impl SitesServerBuilder {
 
     /// Get the sites root dir
     pub fn addrs(&self) -> &Vec<SocketAddr> {
-        self.http.addrs()
+        self.http_server.addrs()
     }
 
     /// Start service
     pub fn run(self) {
-        self.sys.run().unwrap();
+        let Self {mut tokio_runtime, http_server, ..} = self;
+        tokio_runtime.block_on(http_server.run_async());
     }
 
-    /// Start service in another thread
+    /// Start service and execute another fn in separated thread
     pub fn run_with_thread<F>(self, f: F) where F: FnOnce(SitesServer) + Send + 'static {
-        let Self {sys, http, sites_root} = self;
-        let current_system = actix_rt::System::current();
+        let Self {sites_root, mut tokio_runtime, http_server, close_handler} = self;
         std::thread::spawn(move || {
             f(SitesServer {
                 sites_root,
-                current_system,
-                http,
+                close_handler,
             });
         });
-        sys.run().unwrap();
+        tokio_runtime.block_on(http_server.run_async());
+    }
+
+    /// Start service in another thread
+    pub fn run_in_thread(self) -> SitesServer {
+        let Self {sites_root, mut tokio_runtime, http_server, close_handler} = self;
+        std::thread::spawn(move || {
+            tokio_runtime.block_on(http_server.run_async());
+        });
+        SitesServer {
+            sites_root,
+            close_handler,
+        }
     }
 }
 
 /// The server object
 pub struct SitesServer {
     sites_root: PathBuf,
-    current_system: actix_rt::System,
-    http: http::Server,
+    close_handler: http::CloseHandler,
 }
 
 impl SitesServer {
     /// Create a new server
     pub fn new(sites_root: PathBuf) -> SitesServerBuilder {
         info!("Initializing light-letter in {}", sites_root.as_path().to_str().unwrap());
-        let config = sites_config::read_sites_config(&sites_root);
-        db::Db::new(&config);
-        let sys = actix_rt::System::new("light-letter");
-        let http = http::Server::new(sites_root.as_path(), &config);
+        let sites_config = sites_config::read_sites_config(&sites_root);
+        db::Db::new(&sites_config);
+        let tokio_runtime = Builder::new()
+            .threaded_scheduler()
+            .enable_all()
+            .thread_name("light-letter")
+            .build()
+            .unwrap();
+        let (http_server, close_handler) = http::Server::new_with_close_handler(&sites_root, &sites_config);
         SitesServerBuilder {
             sites_root,
-            sys,
-            http,
+            tokio_runtime,
+            http_server,
+            close_handler,
         }
     }
 
@@ -79,15 +98,9 @@ impl SitesServer {
         &self.sites_root
     }
 
-    /// Get the sites root dir
-    pub fn addrs(&self) -> &Vec<SocketAddr> {
-        self.http.addrs()
-    }
-
     /// Stop server
-    pub fn stop(&mut self, graceful: bool) {
-        self.http.stop(graceful);
-        self.current_system.stop();
+    pub fn stop(self) {
+        self.close_handler.close();
     }
 }
 

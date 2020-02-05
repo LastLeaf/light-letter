@@ -168,11 +168,16 @@ macro_rules! routes {
 
 macro_rules! stylesheets {
     ($($comp:ty;)*) => {
-        pub fn get_css_str() -> String {
-            let s = vec![
-                $(<$comp as ComponentTemplate<Empty>>::template_skin()),*
-            ];
-            s.join("")
+        lazy_static::lazy_static! {
+            static ref CSS_STR: &'static str = {
+                let s = vec![
+                    $(<$comp as ComponentTemplate<Empty>>::template_skin()),*
+                ];
+                Box::leak(s.join("").into_boxed_str())
+            };
+        }
+        pub fn get_css_str() -> &'static str {
+            &CSS_STR
         }
     }
 }

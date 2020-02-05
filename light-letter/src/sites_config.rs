@@ -1,3 +1,4 @@
+use std::net::IpAddr;
 use std::path::Path;
 use serde::Deserialize;
 
@@ -10,7 +11,7 @@ pub(crate) struct SitesConfig {
 
 #[derive(Clone, Debug, Deserialize)]
 pub(crate) struct NetConfig {
-    pub(crate) ip: String,
+    pub(crate) ip: IpAddr,
     pub(crate) port: Vec<u16>,
 }
 

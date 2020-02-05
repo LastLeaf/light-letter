@@ -31,13 +31,14 @@ fn generate_server<F>(f: F) where F: FnOnce(u16) + Send + 'static {
     std::fs::write(config, SITES_CONFIG).unwrap();
     let p = std::path::PathBuf::from(temp_dir_path);
     let sites_server = light_letter::SitesServer::new(p);
-    sites_server.run_with_thread(move |mut sites_server| {
-        let port = match sites_server.addrs()[0] {
+    let addrs = sites_server.addrs().clone();
+    sites_server.run_with_thread(move |sites_server| {
+        let port = match addrs[0] {
             SocketAddr::V4(a) => a.port(),
             SocketAddr::V6(a) => a.port(),
         };
         f(port);
-        sites_server.stop(true);
+        sites_server.stop();
     });
     temp_dir.close().unwrap();
 }
