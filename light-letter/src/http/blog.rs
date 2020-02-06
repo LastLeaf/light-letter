@@ -6,8 +6,7 @@ use super::{SiteState, res_utils, error::Error};
 
 thread_local! {
     static CSS_STR: &'static [u8] = get_css_str().as_bytes();
-    static JS_STR: &'static [u8] = include_str!("../../../light-letter-web/pkg/light_letter_web.js").as_bytes(); // TODO change to be able to use with cargo
-    static WASM_STR: &'static [u8] = include_bytes!("../../../light-letter-web/pkg/light_letter_web_bg.wasm"); // TODO change to be able to use with cargo
+    static JS_STR: &'static [u8] = include_str!("../static/light_letter_web.js").as_bytes();
 }
 
 fn http_request_info(req: &Request<Body>) -> ReqInfo {
@@ -30,10 +29,10 @@ fn render_page_component(req: &Request<Body>, prerendered: PrerenderResult) -> R
         title = title,
         style_links = style_links,
     ).unwrap();
-    root_component.to_html(&mut html).unwrap();
+    root_component.to_html_with_id(&mut html, "maomi-prerendered").unwrap();
     write!(
         html,
-        r#"{script_links}<script>__load_maomi_component__(location.path, "{prerendered_data}")</script></body></html>"#,
+        r#"{script_links}<script>__light_letter__.load_maomi_component(location.pathname, "{prerendered_data}")</script></body></html>"#,
         prerendered_data = base64::encode(&prerendered.prerendered_data),
         script_links = script_links,
     ).unwrap();
@@ -61,7 +60,7 @@ pub(crate) fn static_resource(req: &Request<Body>, sub_path: &str, modified: &ch
     match sub_path {
         "light_letter_web.css" => CSS_STR.with(|s| res_utils::cache_ok(req, modified, "text/css", (*s).into())),
         "light_letter_web.js" => JS_STR.with(|s| res_utils::cache_ok(req, modified, "text/javascript", (*s).into())),
-        "light_letter_web_bg.wasm" => WASM_STR.with(|s| res_utils::cache_ok(req, modified, "application/wasm", (*s).into())),
+        // "light_letter_web_bg.wasm" => WASM_STR.with(|s| res_utils::cache_ok(req, modified, "application/wasm", (*s).into())),
         _ => res_utils::not_found(req),
     }
 }

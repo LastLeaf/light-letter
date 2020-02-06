@@ -14,16 +14,15 @@ thread_local! {
     static CONTEXT: std::cell::RefCell<Option<Context<Dom>>> = std::cell::RefCell::new(None);
 }
 
-#[cfg(target_os = "wasm32")]
 fn init_logger() {
     use std::sync::Once;
     static INIT: Once = Once::new();
     INIT.call_once(|| {
+        console_error_panic_hook::set_once();
         console_log::init_with_level(log::Level::Debug).unwrap();
     });
 }
 
-#[cfg(target_os = "wasm32")]
 fn init_prerendered<C: PrerenderableComponent<Dom>>(prerendered_data: &str) {
     init_logger();
     let prerendered_data = base64::decode(&prerendered_data).unwrap();
@@ -59,7 +58,6 @@ fn prerender<C: PrerenderableComponent<Empty>>(args: HashMap<&'static str, &str>
 }
 
 // The entrance in non-ssr mode
-#[cfg(target_os = "wasm32")]
 #[wasm_bindgen]
 pub fn client_render_maomi_component(path: &str, query: &str) {
     unimplemented!()
@@ -78,10 +76,9 @@ macro_rules! routes {
         }
 
         // Load ssr result
-        #[cfg(target_os = "wasm32")]
         #[wasm_bindgen]
         pub fn load_maomi_component(path: &str, data: &str) {
-            let (target, _args) = route_path(req_info.path.as_str());
+            let (target, _args) = route_path(path);
             debug!("Loading prerendered {:?}", target);
             match target {
                 $( $route => init_prerendered::<$comp>(data), )*
@@ -183,9 +180,9 @@ macro_rules! stylesheets {
 }
 
 routes! {
-    "/hello_world" => backstage::login::HelloWorld;
+    "/hello_world" => backstage::login::HelloWorld<_>;
 }
 
 stylesheets! {
-    backstage::login::HelloWorld;
+    backstage::login::HelloWorld<_>;
 }
