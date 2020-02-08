@@ -36,7 +36,10 @@ impl<B: Backend> PrerenderableComponent<B> for HelloWorld<B> {
 }
 impl<B: Backend> HelloWorld<B> {
     fn tap(self: &mut Self) {
-        self.title = "Hello world again!".into();
-        self.ctx.update();
+        // self.title = "Hello world again!".into();
+        // self.ctx.update();
+        self.ctx.tick_with_component_rc(|_| {
+            crate::route_to("/backstage", "");
+        })
     }
 }

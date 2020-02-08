@@ -57,14 +57,50 @@ fn prerender<C: PrerenderableComponent<Empty>>(args: HashMap<&'static str, &str>
     }
 }
 
-// The entrance in non-ssr mode
-#[wasm_bindgen]
-pub fn client_render_maomi_component(path: &str, query: &str) {
-    unimplemented!()
+fn route_to(path: &str, query: &str) {
+    let path_and_query = path.to_string() + if query.len() > 0 { query } else { "" };
+    let history = web_sys::window().unwrap().history().unwrap();
+    history.push_state_with_url(&wasm_bindgen::JsValue::UNDEFINED, "", Some(&path_and_query)).unwrap();
+    wasm_bindgen_futures::spawn_local(client_render_maomi_component(path.to_string(), query.to_string()));
 }
 
 macro_rules! routes {
     ($($route:expr => $comp:ty;)*) => {
+
+        // The entrance in non-ssr mode (used when jump pages)
+        async fn client_render_maomi_component(path: String, query: String) {
+            debug!("Loading page {:?} query {:?}", path, query);
+            let (target, _args) = route_path(&path);
+            let root_component_node = CONTEXT.with(|c| {
+                let mut context = c.borrow_mut();
+                let context = context.as_mut().unwrap();
+                match target {
+                    $( $route => {
+                        let root_component = context.new_root_component::<$comp>();
+                        context.set_root_component(root_component);
+                        context.root_component_node().unwrap()
+                    }, )*
+                    _ => {
+                        let root_component = context.new_root_component::<not_found::NotFound>();
+                        context.set_root_component(root_component);
+                        context.root_component_node().unwrap()
+                    }
+                }
+            });
+            match target {
+                $( $route => {
+                    let root_component = root_component_node.with_type::<$comp>();
+                    let data = <$comp as PrerenderableComponent<_>>::get_prerendered_data(&root_component.borrow()).await;
+                    <$comp as PrerenderableComponent<_>>::apply_prerendered_data(&mut root_component.borrow_mut(), &data);
+                }, )*
+                _ => {
+                    let root_component = root_component_node.with_type::<not_found::NotFound>();
+                    let data = <not_found::NotFound as PrerenderableComponent<Dom>>::get_prerendered_data(&root_component.borrow()).await;
+                    <not_found::NotFound as PrerenderableComponent<Dom>>::apply_prerendered_data(&mut root_component.borrow_mut(), &data);
+                }
+            };
+        }
+
         // Do ssr
         pub fn prerender_maomi_component(req_info: ReqInfo) -> PrerenderResult {
             let (target, args) = route_path(req_info.path.as_str());
@@ -180,7 +216,7 @@ macro_rules! stylesheets {
 }
 
 routes! {
-    "/hello_world" => backstage::login::HelloWorld<_>;
+    "/backstage" => backstage::login::HelloWorld<_>;
 }
 
 stylesheets! {
