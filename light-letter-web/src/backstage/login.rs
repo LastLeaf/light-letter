@@ -1,4 +1,10 @@
+use std::collections::HashMap;
 use maomi::prelude::*;
+
+#[derive(Default, serde::Deserialize)]
+pub struct Query {
+    // empty
+}
 
 template!(xml<B: Backend> for<B> HelloWorld<B> ~HELLO_WORLD {
     <input
@@ -25,8 +31,9 @@ impl<B: Backend> Component<B> for HelloWorld<B> {
     }
 }
 impl<B: Backend> PrerenderableComponent<B> for HelloWorld<B> {
+    type Args = crate::ReqArgs<Query>;
     type PrerenderedData = String;
-    fn get_prerendered_data(&self) -> std::pin::Pin<Box<dyn futures::Future<Output = Self::PrerenderedData>>> {
+    fn get_prerendered_data(&self, _args: Self::Args) -> std::pin::Pin<Box<dyn futures::Future<Output = Self::PrerenderedData>>> {
         Box::pin(futures::future::ready("Hello world from SSR!".into()))
     }
     fn apply_prerendered_data(&mut self, data: &Self::PrerenderedData) {

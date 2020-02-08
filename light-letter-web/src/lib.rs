@@ -38,6 +38,12 @@ pub struct ReqInfo {
     pub query: String,
 }
 
+#[derive(Debug, Clone)]
+pub struct ReqArgs<T: Default> {
+    pub(crate) path_args: HashMap<&'static str, String>,
+    pub(crate) query: T,
+}
+
 #[derive(Clone)]
 pub struct PrerenderResult {
     pub node_rc: ComponentNodeRc<Empty>,
@@ -46,8 +52,8 @@ pub struct PrerenderResult {
     pub is_ok: bool,
 }
 
-fn prerender<C: PrerenderableComponent<Empty>>(args: HashMap<&'static str, &str>, query: &str, is_ok: bool) -> PrerenderResult {
-    let (context, prerendered_data) = maomi::context::Context::prerender::<C>(Empty::new());
+fn prerender<C: PrerenderableComponent<Empty>>(req_args: <C as PrerenderableComponent<Empty>>::Args, is_ok: bool) -> PrerenderResult {
+    let (context, prerendered_data) = maomi::context::Context::prerender::<C>(Empty::new(), req_args);
     let comp = context.root_component::<C>().unwrap().into_node();
     PrerenderResult {
         node_rc: comp,
@@ -70,7 +76,7 @@ macro_rules! routes {
         // The entrance in non-ssr mode (used when jump pages)
         async fn client_render_maomi_component(path: String, query: String) {
             debug!("Loading page {:?} query {:?}", path, query);
-            let (target, _args) = route_path(&path);
+            let (target, path_args) = route_path(&path);
             let root_component_node = CONTEXT.with(|c| {
                 let mut context = c.borrow_mut();
                 let context = context.as_mut().unwrap();
@@ -89,13 +95,15 @@ macro_rules! routes {
             });
             match target {
                 $( $route => {
+                    let req_args = ReqArgs { path_args, query: serde_urlencoded::from_str(&query).unwrap_or_default() };
                     let root_component = root_component_node.with_type::<$comp>();
-                    let data = <$comp as PrerenderableComponent<_>>::get_prerendered_data(&root_component.borrow()).await;
+                    let data = <$comp as PrerenderableComponent<_>>::get_prerendered_data(&root_component.borrow(), req_args).await;
                     <$comp as PrerenderableComponent<_>>::apply_prerendered_data(&mut root_component.borrow_mut(), &data);
                 }, )*
                 _ => {
+                    let req_args = ReqArgs { path_args, query: serde_urlencoded::from_str(&query).unwrap_or_default() };
                     let root_component = root_component_node.with_type::<not_found::NotFound>();
-                    let data = <not_found::NotFound as PrerenderableComponent<Dom>>::get_prerendered_data(&root_component.borrow()).await;
+                    let data = <not_found::NotFound as PrerenderableComponent<Dom>>::get_prerendered_data(&root_component.borrow(), req_args).await;
                     <not_found::NotFound as PrerenderableComponent<Dom>>::apply_prerendered_data(&mut root_component.borrow_mut(), &data);
                 }
             };
@@ -103,11 +111,18 @@ macro_rules! routes {
 
         // Do ssr
         pub fn prerender_maomi_component(req_info: ReqInfo) -> PrerenderResult {
-            let (target, args) = route_path(req_info.path.as_str());
+            let (target, path_args) = route_path(req_info.path.as_str());
+            let query = &req_info.query;
             debug!("Prerendering path {:?} query {:?}, matched route {:?}", &req_info.path, &req_info.query, target);
             match target {
-                $( $route => prerender::<$comp>(args, &req_info.query, true), )*
-                _ => prerender::<not_found::NotFound>(HashMap::new(), "", false)
+                $( $route => {
+                    let req_args: <$comp as PrerenderableComponent<Empty>>::Args = ReqArgs { path_args, query: serde_urlencoded::from_str(query).unwrap_or_default() };
+                    prerender::<$comp>(req_args, true)
+                }, )*
+                _ => {
+                    let req_args: <not_found::NotFound as PrerenderableComponent<Empty>>::Args = ReqArgs { path_args, query: serde_urlencoded::from_str(query).unwrap_or_default() };
+                    prerender::<not_found::NotFound>(req_args, false)
+                }
             }
         }
 
@@ -172,7 +187,7 @@ macro_rules! routes {
         }
 
         // Find route
-        fn route_path(path: &str) -> (&'static str, HashMap<&'static str, &str>) {
+        fn route_path(path: &str) -> (&'static str, HashMap<&'static str, String>) {
             let slices = path.split('/');
             let mut args = HashMap::new();
             let target = ROUTES.with(|root_route_slice| {
@@ -186,7 +201,7 @@ macro_rules! routes {
                     } else if let Some(v) = cur.dynamic_route.as_ref() {
                         let (key, next) = &**v;
                         cur = &next;
-                        args.insert(*key, slice);
+                        args.insert(*key, slice.to_owned());
                     } else {
                         args.clear();
                         return "";
