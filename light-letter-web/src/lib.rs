@@ -64,7 +64,7 @@ fn prerender<C: PrerenderableComponent<Empty>>(req_args: <C as PrerenderableComp
 }
 
 fn route_to(path: &str, query: &str) {
-    let path_and_query = path.to_string() + if query.len() > 0 { query } else { "" };
+    let path_and_query = path.to_string() + if query.len() > 0 { "?" } else { "" } + query;
     let history = web_sys::window().unwrap().history().unwrap();
     history.push_state_with_url(&wasm_bindgen::JsValue::UNDEFINED, "", Some(&path_and_query)).unwrap();
     wasm_bindgen_futures::spawn_local(client_render_maomi_component(path.to_string(), query.to_string()));
