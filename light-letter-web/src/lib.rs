@@ -2,6 +2,8 @@
 
 use std::collections::HashMap;
 #[allow(unused_imports)] use wasm_bindgen::prelude::*;
+use wasm_bindgen::closure::Closure;
+use wasm_bindgen::JsCast;
 use maomi::prelude::*;
 use maomi::Context;
 use maomi::backend::{Dom, Empty};
@@ -52,13 +54,18 @@ pub struct PrerenderResult {
     pub is_ok: bool,
 }
 
-fn prerender<C: PrerenderableComponent<Empty>>(req_args: <C as PrerenderableComponent<Empty>>::Args, is_ok: bool) -> PrerenderResult {
-    let (context, prerendered_data) = maomi::context::Context::prerender::<C>(Empty::new(), req_args);
-    let comp = context.root_component::<C>().unwrap().into_node();
+pub struct PageMetaData {
+    title: String,
+}
+
+fn prerender<C: PrerenderableComponent<Empty, MetaData = PageMetaData>>(req_args: <C as PrerenderableComponent<Empty>>::Args, is_ok: bool) -> PrerenderResult {
+    let (context, prerendered_data, meta_data) = maomi::context::Context::prerender::<C>(Empty::new(), req_args);
+    let comp = context.root_component::<C>().unwrap();
+    let comp_node = comp.into_node();
     PrerenderResult {
-        node_rc: comp,
+        node_rc: comp_node,
         prerendered_data,
-        title: String::new(), // TODO
+        title: meta_data.title,
         is_ok,
     }
 }
@@ -68,6 +75,30 @@ fn route_to(path: &str, query: &str) {
     let history = web_sys::window().unwrap().history().unwrap();
     history.push_state_with_url(&wasm_bindgen::JsValue::UNDEFINED, "", Some(&path_and_query)).unwrap();
     wasm_bindgen_futures::spawn_local(client_render_maomi_component(path.to_string(), query.to_string()));
+}
+
+pub fn history_state_init() {
+    thread_local! {
+        static ONPOPSTATE: Closure<dyn FnMut()> = Closure::wrap(Box::new(move || {
+            let location = web_sys::window().unwrap().location();
+            let location_search = location.search();
+            let location_search = location_search.unwrap();
+            let location_search = if location_search.as_str().len() > 0 {
+                &location_search[1..]
+            } else {
+                ""
+            };
+            route_to(location.pathname().unwrap().as_str(), location_search);
+        }) as Box<dyn FnMut()>);
+    };
+    ONPOPSTATE.with(|cb| {
+        web_sys::window().unwrap().set_onpopstate(Some(cb.as_ref().unchecked_ref()));
+    });
+}
+
+#[wasm_bindgen(start)]
+pub fn wasm_main() {
+    history_state_init();
 }
 
 macro_rules! routes {
@@ -97,13 +128,15 @@ macro_rules! routes {
                 $( $route => {
                     let req_args = ReqArgs { path_args, query: serde_urlencoded::from_str(&query).unwrap_or_default() };
                     let root_component = root_component_node.with_type::<$comp>();
-                    let data = <$comp as PrerenderableComponent<_>>::get_prerendered_data(&root_component.borrow(), req_args).await;
+                    let (data, meta) = <$comp as PrerenderableComponent<_>>::get_prerendered_data(&root_component.borrow(), req_args).await;
+                    web_sys::window().unwrap().document().unwrap().set_title(&meta.title);
                     <$comp as PrerenderableComponent<_>>::apply_prerendered_data(&mut root_component.borrow_mut(), &data);
                 }, )*
                 _ => {
                     let req_args = ReqArgs { path_args, query: serde_urlencoded::from_str(&query).unwrap_or_default() };
                     let root_component = root_component_node.with_type::<not_found::NotFound>();
-                    let data = <not_found::NotFound as PrerenderableComponent<Dom>>::get_prerendered_data(&root_component.borrow(), req_args).await;
+                    let (data, meta) = <not_found::NotFound as PrerenderableComponent<Dom>>::get_prerendered_data(&root_component.borrow(), req_args).await;
+                    web_sys::window().unwrap().document().unwrap().set_title(&meta.title);
                     <not_found::NotFound as PrerenderableComponent<Dom>>::apply_prerendered_data(&mut root_component.borrow_mut(), &data);
                 }
             };

@@ -25,5 +25,7 @@ lazy_static = "1.4.0"
 version = "0.3"
 features = [
   "Window",
+  "Document",
+  "Location",
   "History"
 ]
