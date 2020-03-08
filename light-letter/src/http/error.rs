@@ -14,6 +14,7 @@ pub(crate) struct Error {
 }
 
 impl Error {
+    #[allow(dead_code)]
     pub(crate) fn bad_request<T: fmt::Display>(message: T) -> Self {
         Self {
             kind: ErrorKind::BadRequest,
@@ -28,7 +29,7 @@ impl Error {
     }
     pub(crate) fn internal_server_error<T: fmt::Display>(message: T) -> Self {
         Self {
-            kind: ErrorKind::BadRequest,
+            kind: ErrorKind::InternalServerError,
             message: message.to_string(),
         }
     }

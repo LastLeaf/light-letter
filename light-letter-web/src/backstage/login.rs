@@ -1,56 +1,63 @@
 use maomi::prelude::*;
 
 use crate::PageMetaData;
+use super::*;
 
 #[derive(Default, serde::Deserialize)]
 pub struct Query {
-    r#from: String,
+    username: String,
 }
 
-template!(xml<B: Backend> for<B> HelloWorld<B> ~HELLO_WORLD {
-    <input
-        r#type="button"
-        value={ &self.title }
-        @click={ |mut s, _| s.tap() }
-    ></input>
+template!(xml<B: Backend> for<B> Login<B> ~LOGIN {
+    <TextInput<_>
+        value={ &self.account }
+        placeholder="Account"
+        @update={ |mut s, value: &str| {
+            s.account = value.to_string();
+            s.ctx.update();
+        } }
+    />
+    <TextInput<_>
+        value={ &self.pwd }
+        placeholder="Password"
+        @update={ |mut s, value: &str| {
+            s.pwd = value.to_string();
+            s.ctx.update();
+        } }
+    />
 });
-skin!(HELLO_WORLD = r#"
-    .hello-world {
-        text-align: center;
-    }
+skin!(LOGIN = r#"
+
 "#);
-pub struct HelloWorld<B: Backend> {
+pub struct Login<B: Backend> {
     ctx: ComponentContext<B, Self>,
-    title: String,
+    account: String,
+    pwd: String,
 }
-impl<B: Backend> Component<B> for HelloWorld<B> {
+impl<B: Backend> Component<B> for Login<B> {
     fn new(ctx: ComponentContext<B, Self>) -> Self {
         Self {
             ctx,
-            title: "SSR required...".into()
+            account: String::new(),
+            pwd: String::new(),
         }
     }
 }
-impl<B: Backend> PrerenderableComponent<B> for HelloWorld<B> {
+impl<B: Backend> PrerenderableComponent<B> for Login<B> {
     type Args = crate::ReqArgs<Query>;
     type PrerenderedData = String;
     type MetaData = PageMetaData;
     fn get_prerendered_data(&self, args: Self::Args) -> std::pin::Pin<Box<dyn futures::Future<Output = (Self::PrerenderedData, Self::MetaData)>>> {
         let meta_data = PageMetaData {
-            title: format!("From {}", args.query.r#from),
+            title: "Login".into(),
         };
-        let prerendered_data = format!("Hello world from {}!", args.query.from);
-        Box::pin(futures::future::ready((prerendered_data, meta_data)))
+        Box::pin(futures::future::ready((args.query.username, meta_data)))
     }
     fn apply_prerendered_data(&mut self, data: &Self::PrerenderedData) {
-        self.title = data.clone();
+        self.account = data.clone();
         self.ctx.update();
     }
 }
-impl<B: Backend> HelloWorld<B> {
-    fn tap(self: &mut Self) {
-        self.ctx.tick_with_component_rc(|_| {
-            crate::route_to("/backstage", "from=TEST");
-        })
-    }
+impl<B: Backend> Login<B> {
+    // empty
 }

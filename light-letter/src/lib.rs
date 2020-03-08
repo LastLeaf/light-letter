@@ -6,8 +6,6 @@
 use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
 use tokio::runtime::{Runtime, Builder};
-use hyper::{Body, Request, Response, Server};
-use hyper::service::{make_service_fn, service_fn};
 
 mod sites_config;
 use sites_config::*;

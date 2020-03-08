@@ -40,7 +40,7 @@ fn render_page_component(req: &Request<Body>, prerendered: PrerenderResult) -> R
     if prerendered.is_ok { res_utils::html_ok(req, html.into()) } else { res_utils::not_found(req) }
 }
 
-pub(crate) async fn page(site_state: &SiteState, req: &Request<Body>) -> Response<Body> {
+pub(crate) async fn page(_site_state: &SiteState, req: &Request<Body>) -> Response<Body> {
     if req.method() != "GET" {
         return Error::forbidden("Invalid Method").response();
     }
@@ -49,7 +49,7 @@ pub(crate) async fn page(site_state: &SiteState, req: &Request<Body>) -> Respons
     render_page_component(req, prerendered)
 }
 
-pub(crate) async fn rpc(site_state: &SiteState, req: &Request<Body>, sub_path: &str) -> Response<Body> {
+pub(crate) async fn rpc(_site_state: &SiteState, req: &Request<Body>, _sub_path: &str) -> Response<Body> {
     if req.method() != "POST" {
         return Error::forbidden("Invalid Method").response();
     }
