@@ -2,6 +2,7 @@
 members = [
     "light-letter",
     "light-letter-web",
+    "light-letter-rpc",
 ]
 
 [profile.release]

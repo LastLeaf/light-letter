@@ -48,7 +48,7 @@ pub(crate) async fn page(site_state: &'static SiteState, req: http::request::Par
     }
     let req_info = http_request_info(&req);
     let request_channel = RequestChannel::new(move |path, data| {
-        Box::pin(crate::rpc::rpc_route(path.to_string(), site_state, data).map(|x| x.map_err(|x| RequestError::Custom(x.to_string()))))
+        Box::pin(light_letter_rpc::rpc_route(path.to_string(), site_state, data).map(|x| x.map_err(|x| RequestError::Custom(x.to_string()))))
     });
     let prerendered = prerender_maomi_component(req_info, request_channel);
     render_page_component(&req, prerendered)
@@ -58,6 +58,7 @@ pub(crate) async fn rpc(site_state: &'static SiteState, req: http::request::Part
     if req.method != "POST" {
         return Error::forbidden("Invalid Method").response();
     }
+    // TODO check referrer
     let sub_path = sub_path.to_owned();
     let mut body: Vec<u8> = vec![];
     req_body.for_each(|x| {
@@ -65,7 +66,7 @@ pub(crate) async fn rpc(site_state: &'static SiteState, req: http::request::Part
         body.extend_from_slice(a);
         futures::future::ready(())
     }).await;
-    match crate::rpc::rpc_route(sub_path, site_state, std::str::from_utf8(&body).unwrap_or_default().to_owned()).await {
+    match light_letter_rpc::rpc_route(sub_path, site_state, std::str::from_utf8(&body).unwrap_or_default().to_owned()).await {
         Ok(r) => {
             res_utils::html_ok(&req, std::borrow::Cow::Owned(r.into_bytes()))
         },

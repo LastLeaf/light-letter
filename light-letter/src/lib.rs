@@ -1,20 +1,11 @@
 #[macro_use] extern crate log;
 #[macro_use] extern crate lazy_static;
-#[macro_use] extern crate diesel;
-#[macro_use] extern crate diesel_migrations;
 
 use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
 use tokio::runtime::{Runtime, Builder};
 
-mod sites_config;
-use sites_config::*;
 mod http;
-use crate::http::SiteState;
-mod db;
-mod schema;
-mod models;
-mod rpc;
 
 /// The server builder object
 pub struct SitesServerBuilder {
@@ -76,8 +67,7 @@ impl SitesServer {
     /// Create a new server
     pub fn new(sites_root: PathBuf) -> SitesServerBuilder {
         info!("Initializing light-letter in {}", sites_root.as_path().to_str().unwrap());
-        let sites_config = sites_config::read_sites_config(&sites_root);
-        db::Db::new(&sites_config);
+        let sites_config = light_letter_rpc::sites_config::read_sites_config(&sites_root);
         let tokio_runtime = Builder::new()
             .threaded_scheduler()
             .enable_all()

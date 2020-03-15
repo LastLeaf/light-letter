@@ -8,6 +8,7 @@ use regex::Regex;
 use hyper::{Body, Request, Response, Server as HttpServer};
 use hyper::service::{make_service_fn, service_fn};
 use http::header::*;
+use light_letter_rpc::SiteState;
 
 mod blog;
 mod res_utils;
@@ -17,15 +18,6 @@ pub(crate) struct Server {
     addrs: Vec<SocketAddr>,
     rx: Vec<oneshot::Receiver<()>>,
     site_states: Vec<SiteState>,
-}
-
-#[derive(Clone, Debug)]
-pub(crate) struct SiteState {
-    initialization_time: chrono::DateTime<chrono::Utc>,
-    host: String,
-    host_aliases: Vec<String>,
-    dir: PathBuf,
-    config: crate::SiteConfig,
 }
 
 struct SiteStatesWrapper {
@@ -53,7 +45,7 @@ async fn serve_blog(req: Request<Body>, site_state: &'static SiteState) -> Resul
             "files" => res_utils::file(&req, &dir.join("files"), sub_path).await,
             "static" => blog::static_resource(&req, sub_path, &site_state.initialization_time),
             "rpc" => {
-                let sub_path = sub_path.to_owned();
+                let sub_path = format!("/{}", sub_path);
                 blog::rpc(site_state, req, body, sub_path).await
             },
             _ => blog::page(site_state, req).await,
@@ -104,41 +96,9 @@ async fn serve(req: Request<Body>, site_states: &'static Vec<SiteState>) -> Resu
 }
 
 impl Server {
-    pub(crate) fn new_with_close_handler(sites_root: &Path, config: &crate::SitesConfig) -> (Self, CloseHandler) {
-        let sites_root = sites_root.to_owned();
-
+    pub(crate) fn new_with_close_handler(sites_root: &Path, config: &light_letter_rpc::SitesConfig) -> (Self, CloseHandler) {
         // check config and initialize dir structure for each site
-        let site_states: Vec<SiteState> = config.site.iter().map(|site_config| {
-            lazy_static! {
-                static ref NAME_RE: Regex = Regex::new(r#"^[-_0-9a-zA-Z]+$"#).unwrap();
-            }
-            if !NAME_RE.is_match(site_config.name.as_str()) {
-                panic!(format!(r#"Illegal site name "{}" (site name should only contains letters, numbers, dashes, and underlines)."#, site_config.name))
-            }
-            let dir = sites_root.join("sites").join(site_config.name.as_str());
-            fs_extra::dir::create_all(dir.as_path(), false).unwrap();
-            let site_type = site_config.r#type.clone();
-            match site_type.as_str() {
-                "blog" => {
-                    fs_extra::dir::create_all(dir.join("files").as_path(), false).unwrap();
-                },
-                "static" => {
-                    fs_extra::dir::create_all(dir.join("static").as_path(), false).unwrap();
-                },
-                _ => panic!(format!(r#"Unrecognized site type "{}"."#, &site_type))
-            };
-            debug!(r#"Serve site {} for host "{}", aliases {:?}"#, site_config.name, site_config.host, site_config.alias.as_ref().unwrap_or(&vec![]));
-            let host = site_config.host.clone();
-            let host_aliases = site_config.alias.as_ref().unwrap_or(&vec![]).iter().map(|x| x.clone()).collect();
-            let site_state = SiteState {
-                initialization_time: chrono::Utc::now(),
-                host,
-                host_aliases,
-                dir,
-                config: site_config.clone(),
-            };
-            site_state
-        }).collect();
+        let site_states: Vec<SiteState> = light_letter_rpc::SiteState::from_sites_config(config, sites_root);
 
         let ip = &config.net.ip;
         let addrs: Vec<_> = config.net.port.iter().map(|port| {

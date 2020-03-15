@@ -1,4 +1,5 @@
 use maomi::prelude::*;
+use light_letter_rpc::backstage::login::*;
 
 use crate::PageMetaData;
 use super::*;
@@ -8,18 +9,8 @@ pub struct Query {
     username: String,
 }
 
-#[derive(serde::Serialize, serde::Deserialize)]
-pub struct LoginReq {
-    pub account: String,
-    pub pwd: String,
-}
-
-#[derive(serde::Serialize, serde::Deserialize)]
-pub struct LoginResp {
-    // empty
-}
-
 template!(xml<B: Backend> for<B> Login<B> ~LOGIN {
+    <HintArea<_> mark="hint" />
     <TextInput<_>
         value={ &self.account }
         placeholder="Account"
@@ -38,7 +29,9 @@ template!(xml<B: Backend> for<B> Login<B> ~LOGIN {
     />
     <Button<_>
         @press={|mut s, _| s.login() }
-    />
+    >
+        "Login"
+    </Button>
 });
 skin!(LOGIN = r#"
 
@@ -78,9 +71,20 @@ impl<B: Backend> Login<B> {
             account: self.account.clone(),
             pwd: self.pwd.clone(),
         };
-        crate::run_client_async(async move {
-            let r: Result<LoginResp, _> = crate::client_request_channel().request("", &req).await;
-            // TODO
+        self.ctx.tick_with_component_rc(|s| {
+            crate::run_client_async(async move {
+                match crate::client_request_channel().request("/backstage/login", &req).await {
+                    Err(e) => error!("{}", e),
+                    Ok(resp) => {
+                        let mut s = s.borrow_mut();
+                        match resp {
+                            LoginResp::Success => crate::route_to("/backstage/home", ""),
+                            LoginResp::NoSuchAccount => s.marked_component::<HintArea<_>>("hint").unwrap().borrow_mut_with(&mut s).show_error("No such account"),
+                            LoginResp::WrongPassword => s.marked_component::<HintArea<_>>("hint").unwrap().borrow_mut_with(&mut s).show_error("Wrong password"),
+                        }
+                    }
+                }
+            });
         });
     }
 }

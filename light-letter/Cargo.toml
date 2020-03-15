@@ -13,7 +13,6 @@ name = "light-letter"
 path = "src/main.rs"
 
 [dependencies]
-url = "2.1"
 http = "0.2"
 hyper = { version = "0.13", features = ["stream"] }
 tokio = { version = "0.2", features = ["full"] }
@@ -23,18 +22,15 @@ mime_guess = "2.0"
 chrono = "0.4"
 futures = "0.3"
 serde = "1.0"
-toml = "0.5"
 fs_extra = "1.1"
 failure = "0.1"
 regex = "1.2"
 lazy_static = "1.0"
 log = "0.4"
 env_logger = "0.6"
-diesel = { version = "1.4", features = ["postgres", "uuid", "r2d2"] }
-diesel_migrations = "1.4"
-diesel_derives = "1.4"
 base64 = "0.11"
 maomi = { version = "=0.2.0", path = "../../maomi/maomi" }
+light-letter-rpc = { version = "=0.2.0", path = "../light-letter-rpc" }
 light-letter-web = { version = "=0.2.0", path = "../light-letter-web" }
 
 [dev-dependencies]

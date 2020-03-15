@@ -1,6 +1,7 @@
 CREATE TABLE users (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
+  pwd TEXT NOT NULL,
   email TEXT,
   description TEXT
 );

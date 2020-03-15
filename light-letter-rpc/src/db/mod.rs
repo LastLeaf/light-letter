@@ -26,7 +26,7 @@ fn pg_connection_string(host: &str, port: Option<u16>, db_name: &str, username: 
 }
 
 pub(crate) struct DbPool {
-    pool: r2d2::Pool<r2d2::ConnectionManager<PgConnection>>,
+    pub(crate) pool: r2d2::Pool<r2d2::ConnectionManager<PgConnection>>,
 }
 
 pub(crate) struct Db {
