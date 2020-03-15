@@ -4,6 +4,7 @@ use std::borrow::Cow;
 use std::io::Write;
 use hyper::{Body, Request, Response};
 use bytes::{Bytes, BytesMut};
+use http::request::Parts;
 use http::response::Builder;
 use http::header::*;
 use flate2::write::GzEncoder;
@@ -34,13 +35,13 @@ fn parse_accept_encoding(s: &str) -> &str {
     ""
 }
 
-fn common_builder<F: FnOnce(Builder) -> Builder>(req: &Request<Body>, status: u16, body: Cow<'static, [u8]>, f: F) -> Result<Response<Body>, Error> {
+fn common_builder<F: FnOnce(Builder) -> Builder>(req: &Parts, status: u16, body: Cow<'static, [u8]>, f: F) -> Result<Response<Body>, Error> {
     let mut builder = Response::builder()
         .status(status)
         .header("X-Powered-By", "light-letter")
         .header(VARY, "Accept-Encoding,Cookie");
     builder = f(builder);
-    let accept_encoding = req.headers().get(ACCEPT_ENCODING).map(|x| x.to_str().unwrap_or("")).unwrap_or("");
+    let accept_encoding = req.headers.get(ACCEPT_ENCODING).map(|x| x.to_str().unwrap_or("")).unwrap_or("");
     let body: Body = match parse_accept_encoding(accept_encoding) {
         "gzip" => {
             builder = builder.header(CONTENT_ENCODING, "gzip");
@@ -54,8 +55,17 @@ fn common_builder<F: FnOnce(Builder) -> Builder>(req: &Request<Body>, status: u1
     builder.body(body).map_err(|e| Error::internal_server_error(e))
 }
 
-pub(crate) fn not_found(req: &Request<Body>) -> Response<Body> {
-    debug!("Response with not found for {:?}", req.uri().path());
+pub(crate) fn internal_server_error(req: &Parts, message: String) -> Response<Body> {
+    debug!("Response with internal server error for {:?}", req.uri.path());
+    common_builder(req, 500, Cow::Owned(message.into_bytes()), |builder| {
+        builder
+            .header(CACHE_CONTROL, "no-cache, no-store")
+            .header(CONTENT_TYPE, "text/plain; charset=utf-8")
+    }).unwrap_or_else(|e| e.response())
+}
+
+pub(crate) fn not_found(req: &Parts) -> Response<Body> {
+    debug!("Response with not found for {:?}", req.uri.path());
     common_builder(req, 404, Cow::Borrowed(b"Not Found"), |builder| {
         builder
             .header(CACHE_CONTROL, "no-cache, no-store")
@@ -63,8 +73,8 @@ pub(crate) fn not_found(req: &Request<Body>) -> Response<Body> {
     }).unwrap_or_else(|e| e.response())
 }
 
-pub(crate) fn redirect(req: &Request<Body>, location: &str) -> Response<Body> {
-    debug!("Response with redirect location for {:?}", req.uri().path());
+pub(crate) fn redirect(req: &Parts, location: &str) -> Response<Body> {
+    debug!("Response with redirect location for {:?}", req.uri.path());
     common_builder(req, 302, Cow::Borrowed(b""), |builder| {
         builder
             .header(CACHE_CONTROL, "no-cache, no-store")
@@ -72,8 +82,8 @@ pub(crate) fn redirect(req: &Request<Body>, location: &str) -> Response<Body> {
     }).unwrap_or_else(|e| e.response())
 }
 
-pub(crate) fn html_ok(req: &Request<Body>, body: Cow<'static, [u8]>) -> Response<Body> {
-    debug!("Response with HTML content for {:?}", req.uri().path());
+pub(crate) fn html_ok(req: &Parts, body: Cow<'static, [u8]>) -> Response<Body> {
+    debug!("Response with HTML content for {:?}", req.uri.path());
     common_builder(req, 200, body, |builder| {
         builder
             .header(CACHE_CONTROL, "no-cache, no-store")
@@ -81,12 +91,12 @@ pub(crate) fn html_ok(req: &Request<Body>, body: Cow<'static, [u8]>) -> Response
     }).unwrap_or_else(|e| e.response())
 }
 
-pub(crate) fn cache_ok(req: &Request<Body>, modified: &DateTime<Utc>, content_type: &str, body: Cow<'static, [u8]>) -> Response<Body> {
+pub(crate) fn cache_ok(req: &Parts, modified: &DateTime<Utc>, content_type: &str, body: Cow<'static, [u8]>) -> Response<Body> {
     let status_code = {
-        let if_modified_since = req.headers().get(IF_MODIFIED_SINCE).map(|x| x.to_str().unwrap_or("")).unwrap_or("");
+        let if_modified_since = req.headers.get(IF_MODIFIED_SINCE).map(|x| x.to_str().unwrap_or("")).unwrap_or("");
         if is_unmodified_since(if_modified_since, modified.clone()) { 304 } else { 200 }
     };
-    let head_only = match req.method().as_str() {
+    let head_only = match req.method.as_str() {
         "GET" => status_code == 304,
         "HEAD" => true,
         _ => return Error::forbidden("Invalid Method").response()
@@ -95,7 +105,7 @@ pub(crate) fn cache_ok(req: &Request<Body>, modified: &DateTime<Utc>, content_ty
         false => body,
         true => Cow::Borrowed(b"" as &[u8]),
     };
-    debug!("Response with cached static content for {:?}", req.uri().path());
+    debug!("Response with cached static content for {:?}", req.uri.path());
     common_builder(req, if head_only { 304 } else { 200 }, real_body, |builder| {
         builder
             .header(CACHE_CONTROL, "max-age=0")
@@ -130,7 +140,7 @@ impl tokio::stream::Stream for FileStream {
     }
 }
 
-pub(crate) async fn file(req: &Request<Body>, base: &Path, path: &str) -> Response<Body> {
+pub(crate) async fn file(req: &Parts, base: &Path, path: &str) -> Response<Body> {
     let path = Path::new(path);
     for slice in path.components() {
         if let Component::Normal(_) = slice {
@@ -156,14 +166,14 @@ pub(crate) async fn file(req: &Request<Body>, base: &Path, path: &str) -> Respon
         None
     };
     let status_code = {
-        let if_modified_since = req.headers().get(IF_MODIFIED_SINCE).map(|x| x.to_str().unwrap_or("")).unwrap_or("");
+        let if_modified_since = req.headers.get(IF_MODIFIED_SINCE).map(|x| x.to_str().unwrap_or("")).unwrap_or("");
         if let Some(modified) = modified {
             if is_unmodified_since(if_modified_since, modified.clone()) { 304 } else { 200 }
         } else {
             200
         }
     };
-    let head_only = match req.method().as_str() {
+    let head_only = match req.method.as_str() {
         "GET" => status_code == 304,
         "HEAD" => true,
         _ => return Error::forbidden("Invalid Method").response()
@@ -184,7 +194,7 @@ pub(crate) async fn file(req: &Request<Body>, base: &Path, path: &str) -> Respon
     let use_gzip = if let Some(mime) = mime {
         // TODO impl real stream in gzip mode and remove size limit
         if mime.type_() == "text" && metadata.len() <= 4 * 1024 * 1024 {
-            let accept_encoding = req.headers().get(ACCEPT_ENCODING).map(|x| x.to_str().unwrap_or("")).unwrap_or("");
+            let accept_encoding = req.headers.get(ACCEPT_ENCODING).map(|x| x.to_str().unwrap_or("")).unwrap_or("");
             parse_accept_encoding(accept_encoding) == "gzip"
         } else {
             false

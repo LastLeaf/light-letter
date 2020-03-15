@@ -12,6 +12,9 @@ mod backstage;
 pub use routing::{ReqInfo, ReqArgs, PrerenderResult, PageMetaData};
 pub(crate) use routing::route_to;
 pub use routes::{prerender_maomi_component, get_css_str, load_maomi_component};
+mod request;
+pub(crate) use request::client_request_channel;
+pub use request::{RequestChannel, RequestError};
 
 fn init_logger() {
     use std::sync::Once;
@@ -26,6 +29,10 @@ fn init_logger() {
 pub fn wasm_main() {
     init_logger();
     routing::history_state_init();
+}
+
+fn run_client_async<F: futures::Future<Output = ()> + 'static>(f: F) {
+    wasm_bindgen_futures::spawn_local(f);
 }
 
 mod routes {

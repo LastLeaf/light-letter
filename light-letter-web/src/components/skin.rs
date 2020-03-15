@@ -16,4 +16,13 @@ skin!(pub(super) COMPONENTS = r#"
         line-height: 1.25em;
         font-size: 1em;
     }
+
+    .button {
+        box-sizing: border-box;
+        border: 1px solid main-border-color;
+        background: main-background-color;
+        color: main-color;
+        padding: 3px 5px;
+        line-height: 1.25em;
+    }
 "#);

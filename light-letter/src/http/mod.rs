@@ -38,9 +38,10 @@ impl Drop for SiteStatesWrapper {
     }
 }
 
-async fn serve_blog(req: Request<Body>, site_state: &SiteState) -> Result<Response<Body>, Infallible> {
+async fn serve_blog(req: Request<Body>, site_state: &'static SiteState) -> Result<Response<Body>, Infallible> {
     debug!("Requested {:?} {:?}, matched blog site {:?}", req.method(), req.uri(), site_state.host);
-    let path = req.uri().path();
+    let (req, body) = req.into_parts();
+    let path = req.uri.path();
     let dir = &site_state.dir;
     if path == "/favicon.ico" {
         Ok(res_utils::file(&req, dir, "favicon.ico").await)
@@ -51,22 +52,26 @@ async fn serve_blog(req: Request<Body>, site_state: &SiteState) -> Result<Respon
         let ret = match scope {
             "files" => res_utils::file(&req, &dir.join("files"), sub_path).await,
             "static" => blog::static_resource(&req, sub_path, &site_state.initialization_time),
-            "rpc" => blog::rpc(site_state, &req, sub_path).await,
-            _ => blog::page(site_state, &req).await,
+            "rpc" => {
+                let sub_path = sub_path.to_owned();
+                blog::rpc(site_state, req, body, sub_path).await
+            },
+            _ => blog::page(site_state, req).await,
         };
         Ok(ret)
     }
 }
 
-async fn serve_static(req: Request<Body>, site_state: &SiteState) -> Result<Response<Body>, Infallible> {
+async fn serve_static(req: Request<Body>, site_state: &'static SiteState) -> Result<Response<Body>, Infallible> {
     debug!("Requested {:?} {:?}, matched static site {:?}", req.method(), req.uri(), site_state.host);
-    let path = &req.uri().path()[1..];
+    let req = req.into_parts().0;
+    let path = &req.uri.path()[1..];
     let dir = &site_state.dir;
     let ret = res_utils::file(&req, &dir.join("static"), path).await;
     Ok(ret)
 }
 
-async fn serve(req: Request<Body>, site_states: &Vec<SiteState>) -> Result<Response<Body>, Infallible> {
+async fn serve(req: Request<Body>, site_states: &'static Vec<SiteState>) -> Result<Response<Body>, Infallible> {
     let host = req.headers().get(HOST).map(|x| x.to_str().unwrap_or("")).unwrap_or("");
 
     if let Some(site_state) = site_states.iter().find(|x| {
@@ -89,12 +94,12 @@ async fn serve(req: Request<Body>, site_states: &Vec<SiteState>) -> Result<Respo
         let query = uri.query().unwrap_or("");
         let location = format!("//{}{}{}{}", site_state.host, uri.path(), if query.len() > 0 { "?" } else { "" }, query);
         debug!("Requested {:?} {:?}, redirecting {:?}", req.method(), req.uri(), location);
-        let response = res_utils::redirect(&req, &location);
+        let response = res_utils::redirect(&req.into_parts().0, &location);
         return Ok(response);
     }
 
     warn!("Requested {:?} {:?}, no site matched", req.method(), req.uri());
-    let response = res_utils::not_found(&req);
+    let response = res_utils::not_found(&req.into_parts().0);
     Ok(response)
 }
 

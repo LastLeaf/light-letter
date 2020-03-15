@@ -6,16 +6,19 @@ use maomi::Context;
 use maomi::backend::{Dom, Empty};
 use maomi::node::ComponentNodeRc;
 
+use crate::RequestChannel;
+
 #[derive(Debug, Clone)]
 pub struct ReqInfo {
     pub path: String,
     pub query: String,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct ReqArgs<T: Default> {
     pub(crate) path_args: HashMap<&'static str, String>,
     pub(crate) query: T,
+    pub(crate) request_channel: RequestChannel,
 }
 
 #[derive(Clone)]
@@ -58,7 +61,7 @@ pub(crate) fn route_to(path: &str, query: &str) {
     let path_and_query = path.to_string() + if query.len() > 0 { "?" } else { "" } + query;
     let history = web_sys::window().unwrap().history().unwrap();
     history.push_state_with_url(&wasm_bindgen::JsValue::UNDEFINED, "", Some(&path_and_query)).unwrap();
-    wasm_bindgen_futures::spawn_local(crate::routes::client_render_maomi_component(path.to_string(), query.to_string()));
+    super::run_client_async(crate::routes::client_render_maomi_component(path.to_string(), query.to_string()));
 }
 
 pub(crate) fn history_state_init() {
@@ -103,16 +106,17 @@ macro_rules! routes {
                     }
                 }
             });
+            let request_channel = crate::client_request_channel();
             match target {
                 $( $route => {
-                    let req_args = ReqArgs { path_args, query: serde_urlencoded::from_str(&query).unwrap_or_default() };
+                    let req_args = ReqArgs { path_args, query: serde_urlencoded::from_str(&query).unwrap_or_default(), request_channel };
                     let root_component = root_component_node.with_type::<$comp>();
                     let (data, meta) = <$comp as PrerenderableComponent<_>>::get_prerendered_data(&root_component.borrow(), req_args).await;
                     web_sys::window().unwrap().document().unwrap().set_title(&meta.title);
                     <$comp as PrerenderableComponent<_>>::apply_prerendered_data(&mut root_component.borrow_mut(), &data);
                 }, )*
                 _ => {
-                    let req_args = ReqArgs { path_args, query: serde_urlencoded::from_str(&query).unwrap_or_default() };
+                    let req_args = ReqArgs { path_args, query: serde_urlencoded::from_str(&query).unwrap_or_default(), request_channel };
                     let root_component = root_component_node.with_type::<not_found::NotFound>();
                     let (data, meta) = <not_found::NotFound as PrerenderableComponent<Dom>>::get_prerendered_data(&root_component.borrow(), req_args).await;
                     web_sys::window().unwrap().document().unwrap().set_title(&meta.title);
@@ -122,17 +126,17 @@ macro_rules! routes {
         }
 
         // Do ssr
-        pub fn prerender_maomi_component(req_info: ReqInfo) -> PrerenderResult {
+        pub fn prerender_maomi_component(req_info: ReqInfo, request_channel: RequestChannel) -> PrerenderResult {
             let (target, path_args) = route_path(req_info.path.as_str());
             let query = &req_info.query;
             debug!("Prerendering path {:?} query {:?}, matched route {:?}", &req_info.path, &req_info.query, target);
             match target {
                 $( $route => {
-                    let req_args: <$comp as PrerenderableComponent<Empty>>::Args = ReqArgs { path_args, query: serde_urlencoded::from_str(query).unwrap_or_default() };
+                    let req_args: <$comp as PrerenderableComponent<Empty>>::Args = ReqArgs { path_args, query: serde_urlencoded::from_str(query).unwrap_or_default(), request_channel };
                     prerender::<$comp>(req_args, true)
                 }, )*
                 _ => {
-                    let req_args: <not_found::NotFound as PrerenderableComponent<Empty>>::Args = ReqArgs { path_args, query: serde_urlencoded::from_str(query).unwrap_or_default() };
+                    let req_args: <not_found::NotFound as PrerenderableComponent<Empty>>::Args = ReqArgs { path_args, query: serde_urlencoded::from_str(query).unwrap_or_default(), request_channel };
                     prerender::<not_found::NotFound>(req_args, false)
                 }
             }

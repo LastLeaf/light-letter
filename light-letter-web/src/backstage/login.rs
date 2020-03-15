@@ -8,6 +8,17 @@ pub struct Query {
     username: String,
 }
 
+#[derive(serde::Serialize, serde::Deserialize)]
+pub struct LoginReq {
+    pub account: String,
+    pub pwd: String,
+}
+
+#[derive(serde::Serialize, serde::Deserialize)]
+pub struct LoginResp {
+    // empty
+}
+
 template!(xml<B: Backend> for<B> Login<B> ~LOGIN {
     <TextInput<_>
         value={ &self.account }
@@ -24,6 +35,9 @@ template!(xml<B: Backend> for<B> Login<B> ~LOGIN {
             s.pwd = value.to_string();
             s.ctx.update();
         } }
+    />
+    <Button<_>
+        @press={|mut s, _| s.login() }
     />
 });
 skin!(LOGIN = r#"
@@ -51,7 +65,7 @@ impl<B: Backend> PrerenderableComponent<B> for Login<B> {
         let meta_data = PageMetaData {
             title: "Login".into(),
         };
-        Box::pin(futures::future::ready((args.query.username, meta_data)))
+        Box::pin(async { (args.query.username, meta_data) })
     }
     fn apply_prerendered_data(&mut self, data: &Self::PrerenderedData) {
         self.account = data.clone();
@@ -59,5 +73,14 @@ impl<B: Backend> PrerenderableComponent<B> for Login<B> {
     }
 }
 impl<B: Backend> Login<B> {
-    // empty
+    fn login(&mut self) {
+        let req = LoginReq {
+            account: self.account.clone(),
+            pwd: self.pwd.clone(),
+        };
+        crate::run_client_async(async move {
+            let r: Result<LoginResp, _> = crate::client_request_channel().request("", &req).await;
+            // TODO
+        });
+    }
 }
