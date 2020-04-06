@@ -2,9 +2,14 @@ use std::io::Write;
 use hyper::{Body, Request, Response};
 use futures::future::FutureExt;
 use futures::stream::StreamExt;
-use light_letter_web::{ReqInfo, PrerenderResult, prerender_maomi_component, get_css_str, RequestChannel, RequestError};
+use light_letter_web::{ReqInfo, PrerenderResult, RequestChannel, RequestError, Theme};
+use light_letter_web::{prerender_maomi_component, get_css_str};
 
 use super::{SiteState, res_utils, error::Error};
+
+lazy_static! {
+    static ref VERSION: u32 = rand::random();
+}
 
 thread_local! {
     static CSS_STR: &'static [u8] = get_css_str().as_bytes();
@@ -18,31 +23,32 @@ fn http_request_info(req: &http::request::Parts) -> ReqInfo {
     }
 }
 
-fn render_page_component(req: &http::request::Parts, prerendered: PrerenderResult) -> Response<Body> {
+fn render_page_component(
+    req: &http::request::Parts,
+    prerendered: PrerenderResult,
+    style_url: &str,
+    script_url: &str,
+) -> Response<Body> {
     let title = &prerendered.title;
-    let style_links = r#"<link rel="stylesheet" href="/static/light_letter_web.css">"#;
-    let script_links = r#"<script src="/static/light_letter_web.js"></script>"#;
-
     let root_component = prerendered.node_rc.borrow();
     let mut html: Vec<u8> = vec![];
     write!(
         html,
         r#"<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>{title}</title>{style_links}</head><body>"#,
         title = title,
-        style_links = style_links,
+        style_links = format_args!(r#"<link rel="stylesheet" href="/static/{}?v={}">"#, style_url, *VERSION),
     ).unwrap();
     root_component.to_html_with_id(&mut html, "maomi-prerendered").unwrap();
     write!(
         html,
         r#"{script_links}<script>__light_letter__.load_maomi_component(location.pathname, "{prerendered_data}")</script></body></html>"#,
         prerendered_data = base64::encode(&prerendered.prerendered_data),
-        script_links = script_links,
+        script_links = format_args!(r#"<script src="/static/{}?v={}"></script>"#, script_url, *VERSION),
     ).unwrap();
-
     if prerendered.is_ok { res_utils::html_ok(req, html.into()) } else { res_utils::not_found(req) }
 }
 
-pub(crate) async fn page(site_state: &'static SiteState, req: http::request::Parts) -> Response<Body> {
+pub(crate) async fn backstage_page(site_state: &'static SiteState, req: http::request::Parts) -> Response<Body> {
     if req.method != "GET" {
         return Error::forbidden("Invalid Method").response();
     }
@@ -51,7 +57,20 @@ pub(crate) async fn page(site_state: &'static SiteState, req: http::request::Par
         Box::pin(light_letter_rpc::rpc_route(path.to_string(), site_state, data).map(|x| x.map_err(|x| RequestError::Custom(x.to_string()))))
     });
     let prerendered = prerender_maomi_component(req_info, request_channel);
-    render_page_component(&req, prerendered)
+    render_page_component(&req, prerendered, "light_letter_web.css", "light_letter_web.js")
+}
+
+pub(crate) async fn page(site_state: &'static SiteState, req: http::request::Parts) -> Response<Body> {
+    if req.method != "GET" {
+        return Error::forbidden("Invalid Method").response();
+    }
+    let theme = crate::themes::get(site_state.config.theme.as_ref().map(|x| x.as_str()).unwrap_or(""));
+    let req_info = http_request_info(&req);
+    let request_channel = RequestChannel::new(move |path, data| {
+        Box::pin(light_letter_rpc::rpc_route(path.to_string(), site_state, data).map(|x| x.map_err(|x| RequestError::Custom(x.to_string()))))
+    });
+    let prerendered = theme.prerender_maomi_component(req_info, request_channel);
+    render_page_component(&req, prerendered, &format!("themes/{}.css", theme.name()), &format!("themes/{}.js", theme.name()))
 }
 
 pub(crate) async fn rpc(site_state: &'static SiteState, req: http::request::Parts, req_body: Body, sub_path: String) -> Response<Body> {

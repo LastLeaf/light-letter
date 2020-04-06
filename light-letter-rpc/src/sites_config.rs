@@ -30,6 +30,7 @@ pub struct SiteConfig {
     pub database: Option<String>,
     pub host: String,
     pub alias: Option<Vec<String>>,
+    pub theme: Option<String>,
 }
 
 pub fn read_sites_config(sites_root: &Path) -> SitesConfig {

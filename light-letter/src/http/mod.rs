@@ -48,6 +48,7 @@ async fn serve_blog(req: Request<Body>, site_state: &'static SiteState) -> Resul
                 let sub_path = format!("/{}", sub_path);
                 blog::rpc(site_state, req, body, sub_path).await
             },
+            "backstage" => blog::backstage_page(site_state, req).await,
             _ => blog::page(site_state, req).await,
         };
         Ok(ret)

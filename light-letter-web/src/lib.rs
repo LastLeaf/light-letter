@@ -15,6 +15,8 @@ pub use routes::{prerender_maomi_component, get_css_str, load_maomi_component};
 mod request;
 pub(crate) use request::client_request_channel;
 pub use request::{RequestChannel, RequestError};
+mod theme;
+pub use theme::Theme;
 
 fn init_logger() {
     use std::sync::Once;

@@ -3,6 +3,7 @@ members = [
     "light-letter",
     "light-letter-web",
     "light-letter-rpc",
+    "light-letter-theme-ivy-leaf",
 ]
 
 [profile.release]

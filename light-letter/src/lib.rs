@@ -5,6 +5,7 @@ use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
 use tokio::runtime::{Runtime, Builder};
 
+mod themes;
 mod http;
 
 /// The server builder object
