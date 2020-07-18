@@ -84,6 +84,6 @@ thread_local! {
     };
 }
 
-pub(crate) fn client_request_channel() -> RequestChannel {
+pub fn client_request_channel() -> RequestChannel {
     CLIENT_REQUEST_CHANNEL.with(|x| x.clone())
 }

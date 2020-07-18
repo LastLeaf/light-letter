@@ -21,7 +21,7 @@ serde_json = "1.0"
 serde_urlencoded = "0.6"
 lazy_static = "1.4.0"
 light-letter-rpc = { version = "=0.2.0", path = "../light-letter-rpc" }
-light-letter-web = { version = "=0.2.0", path = "../light-letter-web" }
+light-letter-web = { version = "=0.2.0", path = "../light-letter-web", features = ["wasm_export"] }
 
 [dependencies.web-sys]
 version = "0.3"

@@ -1,10 +1,9 @@
 use std::sync::Arc;
 use std::cell::RefCell;
 use std::net::SocketAddr;
-use std::path::{Path, PathBuf};
+use std::path::{Path};
 use std::convert::Infallible;
 use tokio::sync::oneshot;
-use regex::Regex;
 use hyper::{Body, Request, Response, Server as HttpServer};
 use hyper::service::{make_service_fn, service_fn};
 use http::header::*;
@@ -36,6 +35,7 @@ async fn serve_blog(req: Request<Body>, site_state: &'static SiteState) -> Resul
     let (req, body) = req.into_parts();
     let path = req.uri.path();
     let dir = &site_state.dir;
+    let theme_dir = &site_state.theme_dir;
     if path == "/favicon.ico" {
         Ok(res_utils::file(&req, dir, "favicon.ico").await)
     } else {
@@ -44,6 +44,7 @@ async fn serve_blog(req: Request<Body>, site_state: &'static SiteState) -> Resul
         let sub_path = p.next().unwrap_or("");
         let ret = match scope {
             "files" => res_utils::file(&req, &dir.join("files"), sub_path).await,
+            "theme" => res_utils::file(&req, &theme_dir.join("static"), sub_path).await,
             "static" => blog::static_resource(&req, sub_path, &site_state.initialization_time),
             "rpc" => {
                 let sub_path = format!("/{}", sub_path);

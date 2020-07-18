@@ -2,7 +2,7 @@ use std::pin::Pin;
 use std::path::{Path, Component};
 use std::borrow::Cow;
 use std::io::Write;
-use hyper::{Body, Request, Response};
+use hyper::{Body, Response};
 use bytes::{Bytes, BytesMut};
 use http::request::Parts;
 use http::response::Builder;

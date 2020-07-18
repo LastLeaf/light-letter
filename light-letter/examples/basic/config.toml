@@ -1,6 +1,6 @@
 [resource]
-web = "./light-letter-web/pkg"
-themes = { light-letter-theme-ivy-leaf = "./light-letter-theme-ivy-leaf/pkg" }
+web = "./light-letter-web"
+themes = { light-letter-theme-ivy-leaf = "./light-letter-theme-ivy-leaf" }
 
 [net]
 ip = "127.0.0.1"
@@ -15,6 +15,7 @@ name = "local-1"
 database = "light_letter_local_1"
 type = "blog"
 host = "localhost:2180"
+theme = "light-letter-theme-ivy-leaf"
 
 [[site]]
 name = "local-2"

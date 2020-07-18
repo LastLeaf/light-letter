@@ -1,7 +1,9 @@
 use light_letter_theme_ivy_leaf;
 
-pub(crate) fn get(name: &str) -> impl light_letter_web::Theme {
+// TODO use dylib to load theme
+pub(crate) fn get(name: &str) -> Option<Box<dyn light_letter_web::Theme>> {
     match name {
-        _ => light_letter_theme_ivy_leaf::Theme::new(),
+        "light_letter_theme_ivy_leaf" => Some(Box::new(light_letter_theme_ivy_leaf::Theme::new())),
+        _ => None,
     }
 }

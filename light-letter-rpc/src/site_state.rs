@@ -9,6 +9,8 @@ pub struct SiteState {
     pub host: String,
     pub host_aliases: Vec<String>,
     pub dir: PathBuf,
+    pub theme_mod_name: String,
+    pub theme_dir: PathBuf,
     db_pool: Option<db::DbPool>,
     pub config: crate::SiteConfig,
 }
@@ -45,6 +47,23 @@ impl SiteState {
                 _ => panic!(format!(r#"Unrecognized site type "{}"."#, &site_type))
             };
 
+            // find theme dir
+            let theme_mod_name = site_config.theme.clone().unwrap_or(String::new()).replace('-', "_").to_string();
+            let theme_dir = match site_type.as_str() {
+                "blog" => {
+                    if let Some(theme) = &site_config.theme {
+                        if let Some(theme_dir) = config.resource.themes.get(theme) {
+                            PathBuf::from(theme_dir)
+                        } else {
+                            panic!("Theme {:?} is not defined for site {:?}", theme, site_config.name);
+                        }
+                    } else {
+                        panic!("Theme is not specified for site {:?}", site_config.name);
+                    }
+                },
+                _ => PathBuf::new(),
+            };
+
             // pick out host name and alias
             debug!(r#"Serve site {} for host "{}", aliases {:?}"#, site_config.name, site_config.host, site_config.alias.as_ref().unwrap_or(&vec![]));
             let host = site_config.host.clone();
@@ -55,6 +74,8 @@ impl SiteState {
                 host,
                 host_aliases,
                 dir,
+                theme_mod_name,
+                theme_dir,
                 db_pool,
                 config: site_config.clone(),
             };

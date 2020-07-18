@@ -1,8 +1,8 @@
 use std::io::Write;
-use hyper::{Body, Request, Response};
+use hyper::{Body, Response};
 use futures::future::FutureExt;
 use futures::stream::StreamExt;
-use light_letter_web::{ReqInfo, PrerenderResult, RequestChannel, RequestError, Theme};
+use light_letter_web::{ReqInfo, PrerenderResult, RequestChannel, RequestError};
 use light_letter_web::{prerender_maomi_component, get_css_str};
 
 use super::{SiteState, resource, res_utils, error::Error};
@@ -61,13 +61,14 @@ pub(crate) async fn page(site_state: &'static SiteState, req: http::request::Par
     if req.method != "GET" {
         return Error::forbidden("Invalid Method").response();
     }
-    let theme = crate::themes::get(site_state.config.theme.as_ref().map(|x| x.as_str()).unwrap_or(""));
+    let theme_mod_name = &site_state.theme_mod_name;
+    let theme = crate::themes::get(theme_mod_name).expect("No such theme mod loaded");
     let req_info = http_request_info(&req);
     let request_channel = RequestChannel::new(move |path, data| {
         Box::pin(light_letter_rpc::rpc_route(path.to_string(), site_state, data).map(|x| x.map_err(|x| RequestError::Custom(x.to_string()))))
     });
     let prerendered = theme.prerender_maomi_component(req_info, request_channel);
-    render_page_component(&req, prerendered, &format!("themes/{}.css", theme.name()), &format!("themes/{}.js", theme.name()), &format!("themes/{}_bg.wasm", theme.name()))
+    render_page_component(&req, prerendered, &format!("{}.css", theme_mod_name), &format!("{}.js", theme_mod_name), &format!("{}_bg.wasm", theme_mod_name))
 }
 
 pub(crate) async fn rpc(site_state: &'static SiteState, req: http::request::Parts, req_body: Body, sub_path: String) -> Response<Body> {
@@ -97,6 +98,28 @@ pub(crate) fn static_resource(req: &http::request::Parts, sub_path: &str, modifi
         "light_letter_web.css" => res_utils::cache_ok(req, modified, "text/css", get_css_str().as_bytes().into()),
         "light_letter_web.js" => resource::get(|r| res_utils::cache_ok(req, modified, "text/javascript", r.web_js.into())),
         "light_letter_web_bg.wasm" => resource::get(|r| res_utils::cache_ok(req, modified, "application/wasm", r.web_wasm.into())),
-        _ => res_utils::not_found(req),
+        _ => {
+            resource::get(|r| {
+                if sub_path.ends_with(".css") {
+                    let theme_mod_name = sub_path.get(..(sub_path.len() - 4)).unwrap_or("");
+                    if let Some(theme) = crate::themes::get(theme_mod_name) {
+                        return Some(res_utils::cache_ok(req, modified, "text/css", theme.get_css_str().as_bytes().into()));
+                    }
+                } else if sub_path.ends_with(".js") {
+                    let theme_mod_name = sub_path.get(..(sub_path.len() - 3)).unwrap_or("");
+                    if let Some(s) = r.theme_js.get(theme_mod_name) {
+                        return Some(res_utils::cache_ok(req, modified, "text/javascript", (*s).into()));
+                    }
+                } else if sub_path.ends_with("_bg.wasm") {
+                    let theme_mod_name = sub_path.get(..(sub_path.len() - 8)).unwrap_or("");
+                    if let Some(s) = r.theme_wasm.get(theme_mod_name) {
+                        return Some(res_utils::cache_ok(req, modified, "application/wasm", (*s).into()));
+                    }
+                }
+                None
+            }).unwrap_or_else(|| {
+                res_utils::not_found(req)
+            })
+        },
     }
 }

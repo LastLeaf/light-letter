@@ -22,13 +22,13 @@ pub(crate) struct Resource {
 impl Resource {
     fn new(web_path: &str, theme_paths: &HashMap<String, String>) -> Self {
         let web_path = PathBuf::from(web_path);
-        let web_js = Self::load_file(&web_path.join("light_letter_web.js"));
-        let web_wasm = Self::load_file(&web_path.join("light_letter_web_bg.wasm"));
+        let web_js = Self::load_file(&web_path.join("pkg/light_letter_web.js"));
+        let web_wasm = Self::load_file(&web_path.join("pkg/light_letter_web_bg.wasm"));
         let theme: (HashMap<String, _>, HashMap<String, _>) = theme_paths.iter().map(|(name, theme_path)| {
             let name = name.replace('-', "_");
             let theme_path = PathBuf::from(theme_path);
-            let js = Self::load_file(&theme_path.join(&format!("{}.js", name)));
-            let wasm = Self::load_file(&theme_path.join(&format!("{}_bg.wasm", name)));
+            let js = Self::load_file(&theme_path.join(&format!("pkg/{}.js", name)));
+            let wasm = Self::load_file(&theme_path.join(&format!("pkg/{}_bg.wasm", name)));
             ((name.clone(), js), (name.clone(), wasm))
         }).unzip();
         Self {
