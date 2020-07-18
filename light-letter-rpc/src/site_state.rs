@@ -16,14 +16,22 @@ pub struct SiteState {
 impl SiteState {
     pub fn from_sites_config(config: &crate::SitesConfig, sites_root: &Path) -> Vec<Self> {
         let sites_root = sites_root.to_owned();
+
+        // create one db pool for one site
         let pools = db::Db::new(config).into_pools();
+
+        // check each site
         config.site.iter().zip(pools).map(|(site_config, db_pool)| {
+
+            // validate site name
             lazy_static! {
                 static ref NAME_RE: Regex = Regex::new(r#"^[-_0-9a-zA-Z]+$"#).unwrap();
             }
             if !NAME_RE.is_match(site_config.name.as_str()) {
                 panic!(format!(r#"Illegal site name "{}" (site name should only contains letters, numbers, dashes, and underlines)."#, site_config.name))
             }
+
+            // create dir structure
             let dir = sites_root.join("sites").join(site_config.name.as_str());
             fs_extra::dir::create_all(dir.as_path(), false).unwrap();
             let site_type = site_config.r#type.clone();
@@ -36,9 +44,12 @@ impl SiteState {
                 },
                 _ => panic!(format!(r#"Unrecognized site type "{}"."#, &site_type))
             };
+
+            // pick out host name and alias
             debug!(r#"Serve site {} for host "{}", aliases {:?}"#, site_config.name, site_config.host, site_config.alias.as_ref().unwrap_or(&vec![]));
             let host = site_config.host.clone();
             let host_aliases = site_config.alias.as_ref().unwrap_or(&vec![]).iter().map(|x| x.clone()).collect();
+
             let site_state = SiteState {
                 initialization_time: chrono::Utc::now(),
                 host,

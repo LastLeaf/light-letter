@@ -1,9 +1,17 @@
 use std::net::IpAddr;
 use std::path::Path;
+use std::collections::HashMap;
 use serde::Deserialize;
 
 #[derive(Clone, Debug, Deserialize)]
+pub struct ResourceConfig {
+    pub web: String,
+    pub themes: HashMap<String, String>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
 pub struct SitesConfig {
+    pub resource: ResourceConfig,
     pub net: NetConfig,
     pub db: Option<DbConfig>,
     pub site: Vec<SiteConfig>,

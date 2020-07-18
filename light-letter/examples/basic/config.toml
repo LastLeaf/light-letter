@@ -1,3 +1,7 @@
+[resource]
+web = "./light-letter-web/pkg"
+themes = { light-letter-theme-ivy-leaf = "./light-letter-theme-ivy-leaf/pkg" }
+
 [net]
 ip = "127.0.0.1"
 port = [2180, 2280]

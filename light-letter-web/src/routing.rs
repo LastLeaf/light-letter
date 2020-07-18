@@ -146,7 +146,7 @@ macro_rules! routes {
         #[wasm_bindgen]
         pub fn load_maomi_component(path: &str, data: &str) {
             let (target, _args) = route_path(path);
-            debug!("Loading prerendered {:?}", target);
+            debug!("Loading prerendered {:?} (path {:?})", target, path);
             match target {
                 $( $route => init_prerendered::<$comp>(data), )*
                 _ => init_prerendered::<not_found::NotFound>(data)

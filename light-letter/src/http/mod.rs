@@ -11,6 +11,7 @@ use http::header::*;
 use light_letter_rpc::SiteState;
 
 mod blog;
+mod resource;
 mod res_utils;
 mod error;
 
@@ -101,11 +102,14 @@ impl Server {
         // check config and initialize dir structure for each site
         let site_states: Vec<SiteState> = light_letter_rpc::SiteState::from_sites_config(config, sites_root);
 
+        // load static resources
+        resource::init(config);
+
+        // configure tcp
         let ip = &config.net.ip;
         let addrs: Vec<_> = config.net.port.iter().map(|port| {
             SocketAddr::from((ip.clone(), *port))
         }).collect();
-
         let (tx, rx) = config.net.port.iter().map(|_| {
             tokio::sync::oneshot::channel::<()>()
         }).unzip();
