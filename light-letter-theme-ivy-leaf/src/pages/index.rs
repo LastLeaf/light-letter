@@ -13,10 +13,14 @@ template!(xml<B: Backend> for<B> Index<B> ~INDEX {
             <div class="subtitle"> "Secret Stories " <span class="subtitle-small"> "of" </span> " LastLeaf" </div>
         </div>
         <div class="body">
+            <div class="foreword">
+                <span class="foreword-line"> "当翻找出箱底的日记本时，"</span>
+                <span class="foreword-line"> "是否还能重聚那段消散的时光？"</span>
+            </div>
             <div class="coming-soon"> {&self.hint} </div>
         </div>
         <div class="footer">
-            <div class="copyright"> "Copyright 2014-2020 LastLeaf" </div>
+            <div class="copyright"> "Copyright 2014-2020 lastleaf.me" </div>
             <div class="engine"> "Powered by " <a target="_blank" href="https://github.com/LastLeaf/light-letter"> "light-letter" </a> ", blog engine for the future rust world." </div>
         </div>
     </div>
@@ -85,11 +89,21 @@ skin!(INDEX = r#"
         min-height: 300px;
         background: #effffc;
     }
-    .coming-soon {
-        height: 500px;
-        line-height: 500px;
+    .foreword {
         text-align: center;
-        font-size: 2em;
+        padding: 80px 0 0;
+        max-width: 18em;
+        color: #888;
+        margin: 0 auto;
+    }
+    .foreword-line {
+        white-space: nowrap;
+    }
+    .coming-soon {
+        text-align: center;
+        font-size: 1.5em;
+        height: 40px;
+        padding: 20px 0 200px;
         color: #c0f2e9;
     }
 
