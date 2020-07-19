@@ -21,7 +21,7 @@ template!(xml<B: Backend> for<B> Index<B> ~INDEX {
         </div>
         <div class="footer">
             <div class="copyright"> "Copyright 2014-2020 lastleaf.me" </div>
-            <div class="engine"> "Powered by " <a target="_blank" href="https://github.com/LastLeaf/light-letter"> "light-letter" </a> ", blog engine for the future rust world." </div>
+            <div class="engine"> "Powered by " <a target="_blank" href="https://github.com/LastLeaf/light-letter"> "light-letter" </a> ", blog engine for future rust world." </div>
         </div>
     </div>
 });
@@ -97,7 +97,7 @@ skin!(INDEX = r#"
         margin: 0 auto;
     }
     .foreword-line {
-        white-space: nowrap;
+        display: block;
     }
     .coming-soon {
         text-align: center;
