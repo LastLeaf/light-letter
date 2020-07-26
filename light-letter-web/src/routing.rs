@@ -15,6 +15,7 @@ macro_rules! routes {
                 pub static __CONTEXT: std::cell::RefCell<Option<Context<Dom>>> = std::cell::RefCell::new(None);
             }
             
+            /// Routing method
             #[allow(dead_code)]
             pub fn route_to(path: &str, query: &str) {
                 let path_and_query = path.to_string() + if query.len() > 0 { "?" } else { "" } + query;
@@ -36,7 +37,7 @@ macro_rules! routes {
             }
             
             fn __init_prerendered<C: PrerenderableComponent<Dom>>(prerendered_data: &str) {
-                let prerendered_data = base64::decode(&prerendered_data).unwrap();
+                let prerendered_data = $crate::base64::decode(&prerendered_data).unwrap();
                 let context = maomi::Context::new_prerendered::<C>(Dom::new_prerendering("maomi-prerendered"), &prerendered_data);
                 __CONTEXT.with(|c| {
                     *c.borrow_mut() = Some(context);
@@ -103,7 +104,7 @@ macro_rules! routes {
                 };
             }
 
-            // Do ssr
+            /// SSR loading entrance (should export in `Theme` trait)
             pub fn prerender_maomi_component(req_info: ReqInfo, request_channel: RequestChannel) -> PrerenderResult {
                 let (target, path_args) = route_path(req_info.path.as_str());
                 let query = &req_info.query;
@@ -120,7 +121,7 @@ macro_rules! routes {
                 }
             }
 
-            // Load ssr result
+            /// Non-SSR loading entrance (should export in `Theme` trait)
             #[allow(dead_code)]
             pub fn load_maomi_component(path: &str, data: &str) {
                 __history_state_init();
@@ -219,7 +220,7 @@ macro_rules! stylesheets {
 
             use super::*;
 
-            lazy_static::lazy_static! {
+            $crate::lazy_static::lazy_static! {
                 static ref CSS_STR: &'static str = {
                     let s = vec![
                         $(<$comp as ComponentTemplate<Empty>>::template_skin()),*
@@ -228,6 +229,7 @@ macro_rules! stylesheets {
                 };
             }
 
+            /// Get the preprocessed CSS string (should export in `Theme` trait)
             pub fn get_css_str() -> &'static str {
                 &CSS_STR
             }

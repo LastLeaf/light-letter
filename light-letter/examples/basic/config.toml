@@ -1,5 +1,5 @@
 [resource]
-web = "./light-letter-web"
+backstage = "./light-letter-backstage"
 themes = { light-letter-theme-ivy-leaf = "./light-letter-theme-ivy-leaf" }
 
 [net]

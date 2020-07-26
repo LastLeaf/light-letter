@@ -3,7 +3,6 @@ use hyper::{Body, Response};
 use futures::future::FutureExt;
 use futures::stream::StreamExt;
 use light_letter_web::{ReqInfo, PrerenderResult, RequestChannel, RequestError};
-use light_letter_web::{prerender_maomi_component, get_css_str};
 
 use super::{SiteState, resource, res_utils, error::Error};
 
@@ -53,7 +52,7 @@ pub(crate) async fn backstage_page(site_state: &'static SiteState, req: http::re
     let request_channel = RequestChannel::new(move |path, data| {
         Box::pin(light_letter_rpc::rpc_route(path.to_string(), site_state, data).map(|x| x.map_err(|x| RequestError::Custom(x.to_string()))))
     });
-    let prerendered = prerender_maomi_component(req_info, request_channel);
+    let prerendered = crate::themes::get("backstage").unwrap().prerender_maomi_component(req_info, request_channel);
     render_page_component(&req, prerendered, "light_letter_web.css", "light_letter_web.js", "light_letter_web_bg.wasm")
 }
 
@@ -95,9 +94,9 @@ pub(crate) async fn rpc(site_state: &'static SiteState, req: http::request::Part
 
 pub(crate) fn static_resource(req: &http::request::Parts, sub_path: &str, modified: &chrono::DateTime<chrono::Utc>) -> Response<Body> {
     match sub_path {
-        "light_letter_web.css" => res_utils::cache_ok(req, modified, "text/css", get_css_str().as_bytes().into()),
-        "light_letter_web.js" => resource::get(|r| res_utils::cache_ok(req, modified, "text/javascript", r.web_js.into())),
-        "light_letter_web_bg.wasm" => resource::get(|r| res_utils::cache_ok(req, modified, "application/wasm", r.web_wasm.into())),
+        "light_letter_web.css" => res_utils::cache_ok(req, modified, "text/css", crate::themes::get("backstage").unwrap().get_css_str().as_bytes().into()),
+        "light_letter_web.js" => resource::get(|r| res_utils::cache_ok(req, modified, "text/javascript", r.backstage_js.into())),
+        "light_letter_web_bg.wasm" => resource::get(|r| res_utils::cache_ok(req, modified, "application/wasm", r.backstage_wasm.into())),
         _ => {
             resource::get(|r| {
                 if sub_path.ends_with(".css") {

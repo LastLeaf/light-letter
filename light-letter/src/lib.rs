@@ -69,6 +69,7 @@ impl SitesServer {
     pub fn new(sites_root: PathBuf) -> SitesServerBuilder {
         info!("Initializing light-letter in {}", sites_root.as_path().to_str().unwrap());
         let sites_config = light_letter_rpc::sites_config::read_sites_config(&sites_root);
+        themes::init(&sites_config);
         let tokio_runtime = Builder::new()
             .threaded_scheduler()
             .enable_all()

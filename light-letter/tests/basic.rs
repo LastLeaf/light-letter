@@ -3,6 +3,10 @@ use tempdir::TempDir;
 use light_letter;
 
 const SITES_CONFIG: &'static str = r#"
+    [resource]
+    web = "./light-letter-web"
+    themes = { light-letter-theme-ivy-leaf = "./light-letter-theme-ivy-leaf" }        
+
     [net]
     ip = "0.0.0.0"
     port = [0]

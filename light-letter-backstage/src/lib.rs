@@ -2,9 +2,14 @@
 
 use wasm_bindgen::prelude::*;
 use light_letter_web::*;
+pub use light_letter_web::request::{client_request_channel, RequestChannel, RequestError};
 
-mod not_found;
-mod pages;
+mod components;
+pub mod not_found;
+mod backstage;
+pub(crate) use routes::route_to;
+pub use routes::{prerender_maomi_component};
+pub use stylesheets::get_css_str;
 
 fn init_logger() {
     use std::sync::Once;
@@ -29,9 +34,11 @@ theme!(Theme);
 
 routes! {
     not_found::NotFound,
-    "/" => pages::index::Index<_>;
+    "/backstage" => backstage::login::Login<_>;
 }
 
 stylesheets! {
-    pages::index::Index<_>;
+    // basic components shares one style sheet
+    components::input::TextInput<_>;
+    backstage::login::Login<_>;
 }

@@ -1,36 +1,17 @@
 #[macro_use] extern crate log;
+pub extern crate std;
+pub extern crate lazy_static;
+pub extern crate base64;
 
 use std::collections::HashMap;
-#[allow(unused_imports)] use wasm_bindgen::prelude::*;
 use maomi::prelude::*;
 use maomi::backend::{Empty};
 
-mod components;
-pub mod not_found;
-mod backstage;
-#[macro_use] mod routing;
-pub(crate) use routes::route_to;
-pub use routes::{prerender_maomi_component};
-pub use stylesheets::get_css_str;
-mod request;
-pub use request::client_request_channel;
-pub use request::{RequestChannel, RequestError};
+mod routing;
+pub mod request;
+pub use request::*;
 mod theme;
 pub use theme::Theme;
-
-fn init_logger() {
-    use std::sync::Once;
-    static INIT: Once = Once::new();
-    INIT.call_once(|| {
-        console_error_panic_hook::set_once();
-        console_log::init_with_level(log::Level::Debug).unwrap();
-    });
-}
-
-#[wasm_bindgen(start)]
-pub fn wasm_main() {
-    init_logger();
-}
 
 pub fn run_client_async<F: futures::Future<Output = ()> + 'static>(f: F) {
     wasm_bindgen_futures::spawn_local(f);
@@ -46,7 +27,7 @@ pub struct ReqInfo {
 pub struct ReqArgs<T: Default> {
     pub path_args: HashMap<&'static str, String>,
     pub query: T,
-    pub request_channel: RequestChannel,
+    pub request_channel: request::RequestChannel,
 }
 
 #[derive(Clone)]
@@ -57,23 +38,33 @@ pub struct PrerenderResult {
     pub is_ok: bool,
 }
 
+#[derive(Debug, Clone)]
 pub struct PageMetaData {
     pub title: String,
 }
 
-#[cfg(not(feature = "wasm_export"))]
-#[wasm_bindgen]
-pub fn load_maomi_component(path: &str, data: &str) {
-    routes::load_maomi_component(path, data)
-}
+/// Define a theme for a type.
+/// An instance is created with `Default` for each thread.
+#[macro_export]
+macro_rules! theme {
+    ($name:ty) => {
+        impl $crate::Theme for $name {
+            fn prerender_maomi_component(&self, req_info: ReqInfo, request_channel: RequestChannel) -> PrerenderResult {
+                routes::prerender_maomi_component(req_info, request_channel)
+            }
+            fn get_css_str(&self) -> &'static str {
+                stylesheets::get_css_str()
+            }
+        }
 
-routes! {
-    not_found::NotFound,
-    "/backstage" => backstage::login::Login<_>;
-}
-
-stylesheets! {
-    // basic components shares one style sheet
-    components::input::TextInput<_>;
-    backstage::login::Login<_>;
+        #[no_mangle]
+        pub extern "C" fn load_theme() -> $crate::std::rc::Rc<dyn $crate::Theme> {
+            $crate::std::rc::Rc::new(<$name>::default())
+        }
+        
+        #[wasm_bindgen]
+        pub fn load_maomi_component(path: &str, data: &str) {
+            routes::load_maomi_component(path, data)
+        }
+    }
 }

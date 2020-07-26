@@ -34,7 +34,7 @@ impl RequestChannel {
             f: Rc::new(f)
         }
     }
-    pub(crate) async fn request<R: Serialize, S: for<'a> Deserialize<'a>>(&self, path: &str, data: &R) -> Result<S, RequestError> {
+    pub async fn request<R: Serialize, S: for<'a> Deserialize<'a>>(&self, path: &str, data: &R) -> Result<S, RequestError> {
         let q = serde_json::to_string(data).map_err(|x| RequestError::InvalidRequest(x.to_string()))?;
         let ret = (self.f)(path, q).await?;
         serde_json::from_reader(ret.as_bytes()).map_err(|x| RequestError::InvalidResponse(x.to_string()))
@@ -84,6 +84,7 @@ thread_local! {
     };
 }
 
+/// Get the request channel in browser
 pub fn client_request_channel() -> RequestChannel {
     CLIENT_REQUEST_CHANNEL.with(|x| x.clone())
 }

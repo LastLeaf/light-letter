@@ -1,5 +1,5 @@
 [package]
-name = "light-letter-theme-ivy-leaf"
+name = "light-letter-backstage"
 version = "0.2.0"
 authors = ["LastLeaf <bqfu@163.com>"]
 edition = "2018"
@@ -28,5 +28,4 @@ features = [
   "Location",
   "History",
   "EventTarget",
-  "XmlHttpRequest",
 ]

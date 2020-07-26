@@ -30,6 +30,7 @@ log = "0.4"
 env_logger = "0.6"
 base64 = "0.11"
 rand = "0.7"
+libloading = "0.6"
 maomi = { version = "=0.2.0", path = "../../maomi/maomi" }
 light-letter-rpc = { version = "=0.2.0", path = "../light-letter-rpc" }
 light-letter-web = { version = "=0.2.0", path = "../light-letter-web" }

@@ -1,8 +1,9 @@
 [workspace]
 members = [
     "light-letter",
-    "light-letter-web",
     "light-letter-rpc",
+    "light-letter-web",
+    "light-letter-backstage",
     "light-letter-theme-ivy-leaf",
 ]
 

@@ -5,7 +5,7 @@ use serde::Deserialize;
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct ResourceConfig {
-    pub web: String,
+    pub backstage: String,
     pub themes: HashMap<String, String>,
 }
 
