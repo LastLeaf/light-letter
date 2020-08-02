@@ -2,62 +2,55 @@ use maomi::prelude::*;
 
 use super::*;
 
-enum MessageKind {
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum HintKind {
     Error,
     Warn,
     Info,
     Common,
+    Hidden,
 }
 
 template!(xml<B: Backend> for<B> HintArea<B> ~COMPONENTS {
-    <div
-        class="hint-area"
-    >
-        <for item in {self.messages.iter()}>
-            <div class={
-                match item.0 {
-                    MessageKind::Error => "hint-error",
-                    MessageKind::Warn => "hint-warn",
-                    MessageKind::Info => "hint-info",
-                    MessageKind::Common => "hint-common",
-                }
-            }>
-                { &item.1 }
-            </div>
-        </for>
-    </div>
+    <div class="hint-area"><slot /></div>
 });
 pub struct HintArea<B: Backend> {
     #[allow(dead_code)] ctx: ComponentContext<B, Self>,
-    messages: Vec<(MessageKind, String)>,
 }
 impl<B: Backend> Component<B> for HintArea<B> {
     fn new(ctx: ComponentContext<B, Self>) -> Self {
         Self {
             ctx,
-            messages: Vec::new(),
         }
     }
 }
-impl<B: Backend> HintArea<B> {
-    #[allow(dead_code)]
-    pub(crate) fn show_error(&mut self, message: &str) {
-        self.messages.push((MessageKind::Error, message.to_owned()));
-        self.ctx.update();
-    }
-    #[allow(dead_code)]
-    pub(crate) fn show_warn(&mut self, message: &str) {
-        self.messages.push((MessageKind::Warn, message.to_owned()));
-        self.ctx.update();
-    }
-    #[allow(dead_code)]
-    pub(crate) fn show_info(&mut self, message: &str) {
-        self.messages.push((MessageKind::Info, message.to_owned()));
-        self.ctx.update();
-    }
-    #[allow(dead_code)]
-    pub(crate) fn show(&mut self, message: &str) {
-        self.messages.push((MessageKind::Common, message.to_owned()));
-        self.ctx.update();
+impl<B: Backend> HintArea<B> { }
+
+template!(xml<B: Backend> for<B> Hint<B> ~COMPONENTS {
+    <div class={
+        match self.kind {
+            HintKind::Error => "hint-error",
+            HintKind::Warn => "hint-warn",
+            HintKind::Info => "hint-info",
+            HintKind::Common => "hint-common",
+            HintKind::Hidden => "hint-hidden",
+        }
+    }>
+        { &self.msg }
+    </div>
+});
+pub struct Hint<B: Backend> {
+    #[allow(dead_code)] ctx: ComponentContext<B, Self>,
+    pub kind: HintKind,
+    pub msg: String,
+}
+impl<B: Backend> Component<B> for Hint<B> {
+    fn new(ctx: ComponentContext<B, Self>) -> Self {
+        Self {
+            ctx,
+            kind: HintKind::Hidden,
+            msg: String::new(),
+        }
     }
 }
+impl<B: Backend> Hint<B> { }

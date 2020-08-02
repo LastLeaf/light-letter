@@ -22,8 +22,8 @@ pub(crate) struct Resource {
 impl Resource {
     fn new(backstage_path: &str, theme_paths: &HashMap<String, String>) -> Self {
         let backstage_path = PathBuf::from(backstage_path);
-        let backstage_js = Self::load_file(&backstage_path.join("pkg/light_letter_web.js"));
-        let backstage_wasm = Self::load_file(&backstage_path.join("pkg/light_letter_web_bg.wasm"));
+        let backstage_js = Self::load_file(&backstage_path.join("pkg/light_letter_backstage.js"));
+        let backstage_wasm = Self::load_file(&backstage_path.join("pkg/light_letter_backstage_bg.wasm"));
         let theme: (HashMap<String, _>, HashMap<String, _>) = theme_paths.iter().map(|(name, theme_path)| {
             let name = name.replace('-', "_");
             let theme_path = PathBuf::from(theme_path);

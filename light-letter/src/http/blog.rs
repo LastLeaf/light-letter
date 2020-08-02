@@ -3,6 +3,7 @@ use hyper::{Body, Response};
 use futures::future::FutureExt;
 use futures::stream::StreamExt;
 use light_letter_web::{ReqInfo, PrerenderResult, RequestChannel, RequestError};
+use light_letter_rpc::session::Session;
 
 use super::{SiteState, resource, res_utils, error::Error};
 
@@ -44,19 +45,22 @@ fn render_page_component(
     if prerendered.is_ok { res_utils::html_ok(req, html.into()) } else { res_utils::not_found(req) }
 }
 
-pub(crate) async fn backstage_page(site_state: &'static SiteState, req: http::request::Parts) -> Response<Body> {
+pub(crate) async fn backstage_page(site_state: &'static SiteState, req: http::request::Parts, session: Session) -> Response<Body> {
     if req.method != "GET" {
         return Error::forbidden("Invalid Method").response();
     }
     let req_info = http_request_info(&req);
     let request_channel = RequestChannel::new(move |path, data| {
-        Box::pin(light_letter_rpc::rpc_route(path.to_string(), site_state, data).map(|x| x.map_err(|x| RequestError::Custom(x.to_string()))))
+        Box::pin(
+            light_letter_rpc::rpc_route(path.to_string(), site_state, data, session.clone())
+                .map(|x| x.map(|x| x.0).map_err(|x| RequestError::Custom(x.to_string())))
+        )
     });
     let prerendered = crate::themes::get("backstage").unwrap().prerender_maomi_component(req_info, request_channel);
-    render_page_component(&req, prerendered, "light_letter_web.css", "light_letter_web.js", "light_letter_web_bg.wasm")
+    render_page_component(&req, prerendered, "light_letter_backstage.css", "light_letter_backstage.js", "light_letter_backstage_bg.wasm")
 }
 
-pub(crate) async fn page(site_state: &'static SiteState, req: http::request::Parts) -> Response<Body> {
+pub(crate) async fn page(site_state: &'static SiteState, req: http::request::Parts, session: Session) -> Response<Body> {
     if req.method != "GET" {
         return Error::forbidden("Invalid Method").response();
     }
@@ -64,17 +68,35 @@ pub(crate) async fn page(site_state: &'static SiteState, req: http::request::Par
     let theme = crate::themes::get(theme_mod_name).expect("No such theme mod loaded");
     let req_info = http_request_info(&req);
     let request_channel = RequestChannel::new(move |path, data| {
-        Box::pin(light_letter_rpc::rpc_route(path.to_string(), site_state, data).map(|x| x.map_err(|x| RequestError::Custom(x.to_string()))))
+        Box::pin(
+            light_letter_rpc::rpc_route(path.to_string(), site_state, data, session.clone())
+                .map(|x| x.map(|x| x.0).map_err(|x| RequestError::Custom(x.to_string())))
+        )
     });
     let prerendered = theme.prerender_maomi_component(req_info, request_channel);
     render_page_component(&req, prerendered, &format!("{}.css", theme_mod_name), &format!("{}.js", theme_mod_name), &format!("{}_bg.wasm", theme_mod_name))
 }
 
-pub(crate) async fn rpc(site_state: &'static SiteState, req: http::request::Parts, req_body: Body, sub_path: String) -> Response<Body> {
+pub(crate) async fn rpc(site_state: &'static SiteState, req: http::request::Parts, req_body: Body, sub_path: String, session: Session) -> Response<Body> {
     if req.method != "POST" {
         return Error::forbidden("Invalid Method").response();
     }
-    // TODO check referrer
+    let match_host = req.headers.get(hyper::header::REFERER).and_then(|x| {
+        x.to_str().ok().and_then(|x| {
+            url::Url::parse(x).ok().map(|x| {
+                let host = x.host_str().unwrap_or("");
+                let port = x.port();
+                let host_port = match port {
+                    Some(p) => format!("{}:{}", host, p),
+                    None => host.to_string(),
+                };
+                host_port == site_state.host
+            })
+        })
+    }).unwrap_or(false);
+    if !match_host {
+        return Error::forbidden("Invalid Referrer").response();
+    }
     let sub_path = sub_path.to_owned();
     let mut body: Vec<u8> = vec![];
     req_body.for_each(|x| {
@@ -82,9 +104,13 @@ pub(crate) async fn rpc(site_state: &'static SiteState, req: http::request::Part
         body.extend_from_slice(a);
         futures::future::ready(())
     }).await;
-    match light_letter_rpc::rpc_route(sub_path, site_state, std::str::from_utf8(&body).unwrap_or_default().to_owned()).await {
-        Ok(r) => {
-            res_utils::html_ok(&req, std::borrow::Cow::Owned(r.into_bytes()))
+    match light_letter_rpc::rpc_route(sub_path, site_state, std::str::from_utf8(&body).unwrap_or_default().to_owned(), session).await {
+        Ok((r, session)) => {
+            if let Some(session) = session {
+                res_utils::html_ok_with_session(&req, session.generate_sig_str(), std::borrow::Cow::Owned(r.into_bytes()))
+            } else {
+                res_utils::html_ok(&req, std::borrow::Cow::Owned(r.into_bytes()))
+            }
         },
         Err(e) => {
             res_utils::internal_server_error(&req, e.to_string())
@@ -94,9 +120,9 @@ pub(crate) async fn rpc(site_state: &'static SiteState, req: http::request::Part
 
 pub(crate) fn static_resource(req: &http::request::Parts, sub_path: &str, modified: &chrono::DateTime<chrono::Utc>) -> Response<Body> {
     match sub_path {
-        "light_letter_web.css" => res_utils::cache_ok(req, modified, "text/css", crate::themes::get("backstage").unwrap().get_css_str().as_bytes().into()),
-        "light_letter_web.js" => resource::get(|r| res_utils::cache_ok(req, modified, "text/javascript", r.backstage_js.into())),
-        "light_letter_web_bg.wasm" => resource::get(|r| res_utils::cache_ok(req, modified, "application/wasm", r.backstage_wasm.into())),
+        "light_letter_backstage.css" => res_utils::cache_ok(req, modified, "text/css", crate::themes::get("backstage").unwrap().get_css_str().as_bytes().into()),
+        "light_letter_backstage.js" => resource::get(|r| res_utils::cache_ok(req, modified, "text/javascript", r.backstage_js.into())),
+        "light_letter_backstage_bg.wasm" => resource::get(|r| res_utils::cache_ok(req, modified, "application/wasm", r.backstage_wasm.into())),
         _ => {
             resource::get(|r| {
                 if sub_path.ends_with(".css") {

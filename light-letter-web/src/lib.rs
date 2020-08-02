@@ -2,6 +2,7 @@
 pub extern crate std;
 pub extern crate lazy_static;
 pub extern crate base64;
+pub extern crate serde;
 
 use std::collections::HashMap;
 use maomi::prelude::*;

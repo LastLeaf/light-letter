@@ -17,11 +17,30 @@ macro_rules! routes {
             
             /// Routing method
             #[allow(dead_code)]
-            pub fn route_to(path: &str, query: &str) {
-                let path_and_query = path.to_string() + if query.len() > 0 { "?" } else { "" } + query;
-                let history = web_sys::window().unwrap().history().unwrap();
-                history.push_state_with_url(&wasm_bindgen::JsValue::UNDEFINED, "", Some(&path_and_query)).unwrap();
-                $crate::run_client_async(__client_render_maomi_component(path.to_string(), query.to_string()));
+            pub fn route_to<T: $crate::serde::Serialize>(path: &str, query: T) {
+                let query = serde_urlencoded::to_string(query).unwrap();
+                let path_and_query = path.to_string() + if query.len() > 0 { "?" } else { "" } + &query;
+                let path = path.to_string();
+                $crate::run_client_async(async move {
+                    maomi::backend::dom::Timeout::new(100).await;
+                    let history = web_sys::window().unwrap().history().unwrap();
+                    history.push_state_with_url(&wasm_bindgen::JsValue::UNDEFINED, "", Some(&path_and_query)).unwrap();
+                    $crate::run_client_async(__client_render_maomi_component(path, query));
+                });
+            }
+            
+            /// Routing method
+            #[allow(dead_code)]
+            pub fn redirect_to<T: $crate::serde::Serialize>(path: &str, query: T) {
+                let query = serde_urlencoded::to_string(query).unwrap();
+                let path_and_query = path.to_string() + if query.len() > 0 { "?" } else { "" } + &query;
+                let path = path.to_string();
+                $crate::run_client_async(async move {
+                    maomi::backend::dom::Timeout::new(100).await;
+                    let history = web_sys::window().unwrap().history().unwrap();
+                    history.replace_state_with_url(&wasm_bindgen::JsValue::UNDEFINED, "", Some(&path_and_query)).unwrap();
+                    $crate::run_client_async(__client_render_maomi_component(path, query));
+                });
             }
 
             fn __prerender<C: PrerenderableComponent<Empty, MetaData = PageMetaData>>(req_args: <C as PrerenderableComponent<Empty>>::Args, is_ok: bool) -> PrerenderResult {
@@ -56,7 +75,7 @@ macro_rules! routes {
                             } else {
                                 ""
                             };
-                            route_to(location.pathname().unwrap().as_str(), location_search);
+                            $crate::run_client_async(__client_render_maomi_component(location.pathname().unwrap(), location_search.to_string()));
                         }) as Box<dyn FnMut()>);
                         web_sys::window().unwrap().set_onpopstate(Some(cb.as_ref().unchecked_ref()));
                     };
@@ -74,14 +93,10 @@ macro_rules! routes {
                     let context = context.as_mut().unwrap();
                     match target {
                         $( $route => {
-                            let root_component = context.new_root_component::<$comp>();
-                            context.set_root_component(root_component);
-                            context.root_component_node().unwrap()
+                            context.new_root_component::<$comp>().as_node().clone()
                         }, )*
                         _ => {
-                            let root_component = context.new_root_component::<$default_comp>();
-                            context.set_root_component(root_component);
-                            context.root_component_node().unwrap()
+                            context.new_root_component::<$default_comp>().as_node().clone()
                         }
                     }
                 });
@@ -89,22 +104,27 @@ macro_rules! routes {
                 match target {
                     $( $route => {
                         let req_args = ReqArgs { path_args, query: serde_urlencoded::from_str(&query).unwrap_or_default(), request_channel };
-                        let root_component = root_component_node.with_type::<$comp>();
+                        let root_component = root_component_node.clone().with_type::<$comp>();
                         let (data, meta) = <$comp as PrerenderableComponent<_>>::get_prerendered_data(&root_component.borrow(), req_args).await;
                         web_sys::window().unwrap().document().unwrap().set_title(&meta.title);
                         <$comp as PrerenderableComponent<_>>::apply_prerendered_data(&mut root_component.borrow_mut(), &data);
                     }, )*
                     _ => {
                         let req_args = ReqArgs { path_args, query: serde_urlencoded::from_str(&query).unwrap_or_default(), request_channel };
-                        let root_component = root_component_node.with_type::<$default_comp>();
+                        let root_component = root_component_node.clone().with_type::<$default_comp>();
                         let (data, meta) = <$default_comp as PrerenderableComponent<Dom>>::get_prerendered_data(&root_component.borrow(), req_args).await;
                         web_sys::window().unwrap().document().unwrap().set_title(&meta.title);
                         <$default_comp as PrerenderableComponent<Dom>>::apply_prerendered_data(&mut root_component.borrow_mut(), &data);
                     }
                 };
+                __CONTEXT.with(|c| {
+                    let mut context = c.borrow_mut();
+                    let context = context.as_mut().unwrap();
+                    context.set_root_component_node(root_component_node);
+                });
             }
 
-            /// SSR loading entrance (should export in `Theme` trait)
+            /// SSR loading entrance in server (should export in `Theme` trait)
             pub fn prerender_maomi_component(req_info: ReqInfo, request_channel: RequestChannel) -> PrerenderResult {
                 let (target, path_args) = route_path(req_info.path.as_str());
                 let query = &req_info.query;
@@ -121,7 +141,7 @@ macro_rules! routes {
                 }
             }
 
-            /// Non-SSR loading entrance (should export in `Theme` trait)
+            /// SSR loading entrance in browser (should export in `Theme` trait)
             #[allow(dead_code)]
             pub fn load_maomi_component(path: &str, data: &str) {
                 __history_state_init();

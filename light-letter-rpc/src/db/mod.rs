@@ -19,7 +19,7 @@ fn pg_connection_string(host: &str, port: Option<u16>, db_name: &str, username: 
     let mut u = Url::parse("postgresql://localhost/postgres").unwrap();
     u.set_host(Some(host)).unwrap();
     u.set_port(port).unwrap();
-    u.set_path(db_name);
+    u.set_path(&format!("/{}", db_name));
     u.set_username(username).unwrap();
     u.set_password(Some(password)).unwrap();
     u.as_str().to_owned()

@@ -3,6 +3,7 @@ members = [
     "light-letter",
     "light-letter-rpc",
     "light-letter-web",
+    "light-letter-i18n",
     "light-letter-backstage",
     "light-letter-theme-ivy-leaf",
 ]

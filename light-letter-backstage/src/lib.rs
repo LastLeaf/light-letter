@@ -4,10 +4,11 @@ use wasm_bindgen::prelude::*;
 use light_letter_web::*;
 pub use light_letter_web::request::{client_request_channel, RequestChannel, RequestError};
 
+#[macro_use] mod i18n;
 mod components;
 pub mod not_found;
 mod backstage;
-pub(crate) use routes::route_to;
+#[allow(dead_code)] use routes::{route_to, redirect_to};
 pub use routes::{prerender_maomi_component};
 pub use stylesheets::get_css_str;
 
@@ -34,7 +35,8 @@ theme!(Theme);
 
 routes! {
     not_found::NotFound,
-    "/backstage" => backstage::login::Login<_>;
+    "/backstage" => backstage::home::Home<_>;
+    "/backstage/login" => backstage::login::Login<_>;
 }
 
 stylesheets! {

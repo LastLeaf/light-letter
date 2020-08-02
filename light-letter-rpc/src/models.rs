@@ -8,3 +8,9 @@ pub struct User {
     pub email: Option<String>,
     pub description: Option<String>,
 }
+
+#[derive(Queryable)]
+pub struct Config {
+    pub key: String,
+    pub value: String,
+}

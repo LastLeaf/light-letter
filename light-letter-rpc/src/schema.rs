@@ -7,6 +7,13 @@ table! {
 }
 
 table! {
+    config (key) {
+        key -> Text,
+        value -> Text,
+    }
+}
+
+table! {
     post_tags (post, tag) {
         post -> Uuid,
         tag -> Text,
@@ -54,6 +61,7 @@ joinable!(posts -> series (series));
 
 allow_tables_to_appear_in_same_query!(
     categories,
+    config,
     post_tags,
     posts,
     series,

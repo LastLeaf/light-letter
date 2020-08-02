@@ -18,7 +18,7 @@ use super::error::Error;
 fn is_unmodified_since(if_modified_since: &str, modified: DateTime<Utc>) -> bool {
     let since = DateTime::<FixedOffset>::parse_from_rfc2822(if_modified_since);
     let ret = match since {
-        Ok(t) => t >= (modified - Duration::seconds(1)).into(),
+        Ok(t) => t >= DateTime::<FixedOffset>::from(modified - Duration::seconds(1)),
         Err(_) => false
     };
     ret
@@ -88,6 +88,22 @@ pub(crate) fn html_ok(req: &Parts, body: Cow<'static, [u8]>) -> Response<Body> {
         builder
             .header(CACHE_CONTROL, "no-cache, no-store")
             .header(CONTENT_TYPE, "text/html; charset=utf-8")
+    }).unwrap_or_else(|e| e.response())
+}
+
+pub(crate) fn html_ok_with_session(req: &Parts, session: String, body: Cow<'static, [u8]>) -> Response<Body> {
+    debug!("Response with HTML content for {:?}", req.uri.path());
+    let cookie = cookie::Cookie::build(super::SESSION_COOKIE_NAME, session)
+        .path("/")
+        .secure(false)
+        .http_only(true)
+        .max_age(time::Duration::days(1))
+        .finish();
+    common_builder(req, 200, body, |builder| {
+        builder
+            .header(CACHE_CONTROL, "no-cache, no-store")
+            .header(CONTENT_TYPE, "text/html; charset=utf-8")
+            .header(SET_COOKIE, &cookie.encoded().to_string())
     }).unwrap_or_else(|e| e.response())
 }
 

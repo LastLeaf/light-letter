@@ -7,12 +7,14 @@ use tokio::sync::oneshot;
 use hyper::{Body, Request, Response, Server as HttpServer};
 use hyper::service::{make_service_fn, service_fn};
 use http::header::*;
-use light_letter_rpc::SiteState;
+use light_letter_rpc::{SiteState, session::Session};
 
 mod blog;
 mod resource;
 mod res_utils;
 mod error;
+
+const SESSION_COOKIE_NAME: &'static str = "light-letter-session";
 
 pub(crate) struct Server {
     addrs: Vec<SocketAddr>,
@@ -42,16 +44,29 @@ async fn serve_blog(req: Request<Body>, site_state: &'static SiteState) -> Resul
         let mut p = path[1..].splitn(2, '/');
         let scope = p.next().unwrap_or("");
         let sub_path = p.next().unwrap_or("");
+        let cookie = req.headers.get_all(COOKIE).iter().find_map(|x| {
+            if let Ok(x) = x.to_str() {
+                for x in x.split(';') {
+                    if let Ok(x) = cookie::Cookie::parse_encoded(x) {
+                        if x.name() == SESSION_COOKIE_NAME {
+                            return Some(x.value().to_owned())
+                        }
+                    }
+                }
+            }
+            None
+        });
+        let session = Session::parse_sig_str(&cookie.unwrap_or_default()).unwrap_or_default();
         let ret = match scope {
             "files" => res_utils::file(&req, &dir.join("files"), sub_path).await,
             "theme" => res_utils::file(&req, &theme_dir.join("static"), sub_path).await,
             "static" => blog::static_resource(&req, sub_path, &site_state.initialization_time),
             "rpc" => {
                 let sub_path = format!("/{}", sub_path);
-                blog::rpc(site_state, req, body, sub_path).await
+                blog::rpc(site_state, req, body, sub_path, session).await
             },
-            "backstage" => blog::backstage_page(site_state, req).await,
-            _ => blog::page(site_state, req).await,
+            "backstage" => blog::backstage_page(site_state, req, session).await,
+            _ => blog::page(site_state, req, session).await,
         };
         Ok(ret)
     }
