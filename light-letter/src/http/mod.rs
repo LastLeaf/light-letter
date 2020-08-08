@@ -56,7 +56,7 @@ async fn serve_blog(req: Request<Body>, site_state: &'static SiteState) -> Resul
             }
             None
         });
-        let session = Session::parse_sig_str(&cookie.unwrap_or_default()).unwrap_or_default();
+        let session = Session::parse_sig_str(&cookie.unwrap_or_default()).await.unwrap_or_default();
         let ret = match scope {
             "files" => res_utils::file(&req, &dir.join("files"), sub_path).await,
             "theme" => res_utils::file(&req, &theme_dir.join("static"), sub_path).await,

@@ -107,7 +107,7 @@ pub(crate) async fn rpc(site_state: &'static SiteState, req: http::request::Part
     match light_letter_rpc::rpc_route(sub_path, site_state, std::str::from_utf8(&body).unwrap_or_default().to_owned(), session).await {
         Ok((r, session)) => {
             if let Some(session) = session {
-                res_utils::html_ok_with_session(&req, session.generate_sig_str(), std::borrow::Cow::Owned(r.into_bytes()))
+                res_utils::html_ok_with_session(&req, session.generate_sig_str().await, std::borrow::Cow::Owned(r.into_bytes()))
             } else {
                 res_utils::html_ok(&req, std::borrow::Cow::Owned(r.into_bytes()))
             }

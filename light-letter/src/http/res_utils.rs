@@ -12,6 +12,7 @@ use flate2::Compression;
 use futures::task::{Poll, Context};
 use tokio::io::AsyncRead;
 use chrono::{DateTime, Utc, FixedOffset, Duration};
+use light_letter_rpc::session::SESSION_TIMEOUT;
 
 use super::error::Error;
 
@@ -97,7 +98,8 @@ pub(crate) fn html_ok_with_session(req: &Parts, session: String, body: Cow<'stat
         .path("/")
         .secure(false)
         .http_only(true)
-        .max_age(time::Duration::days(1))
+        .same_site(cookie::SameSite::Strict)
+        .max_age(time::Duration::seconds(SESSION_TIMEOUT as i64))
         .finish();
     common_builder(req, 200, body, |builder| {
         builder

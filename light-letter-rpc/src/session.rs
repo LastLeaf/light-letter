@@ -1,27 +1,51 @@
+#[cfg(not(target_arch = "wasm32"))]
+use tokio::fs;
+use std::path::{PathBuf};
 use sha2::{Sha256, Digest};
 use rand::Rng;
 
-const SESSION_TIMEOUT: u32 = 86400;
+pub const SESSION_TIMEOUT: u32 = 86400;
 
+#[cfg(not(target_arch = "wasm32"))]
 lazy_static! {
-    static ref RANDOM_SALT: &'static str = {
-        let buf: [u8; 32] = rand::thread_rng().gen();
-        Box::leak(format!("{:x?}", buf).into_boxed_str())
+    static ref TMP_DIR: PathBuf = {
+        let mut dir = std::env::temp_dir();
+        dir.push("light-letter");
+        std::fs::create_dir_all(&dir).expect("Failed initializing tmp files");
+        dir
     };
 }
 
+#[cfg(not(target_arch = "wasm32"))]
+async fn save_session_file(id: &str, content: &str) {
+    let mut p = TMP_DIR.clone();
+    p.push(id);
+    if let Err(e) = fs::write(p, content).await {
+        error!("Failed save session file: {}", e);
+    }
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+async fn load_session_file(id: &str) -> Option<String> {
+    let mut p = TMP_DIR.clone();
+    p.push(id);
+    fs::read_to_string(p).await.ok()
+}
+
+#[cfg(not(target_arch = "wasm32"))]
 fn hash_pwd(unique_salt: &str, expire_ts: u32, content: &str) -> String {
     let mut s = Sha256::new();
-    s.input(format!("{}{}{}{}", unique_salt, expire_ts, content, *RANDOM_SALT).as_bytes());
+    crate::sites_config::SECURE_RANDOM_STRING.with(|srs| {
+        s.input(format!("{}{}{}{}", unique_salt, expire_ts, content, &srs).as_bytes());
+    });
     format!("{:x}", s.result())
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 fn current_ts() -> u32 {
     use std::time::*;
     let start = SystemTime::now();
-    let since_the_epoch = start
-        .duration_since(UNIX_EPOCH)
-        .expect("Time went backwards");
+    let since_the_epoch = start.duration_since(UNIX_EPOCH).unwrap_or_default();
     since_the_epoch.as_secs() as u32
 }
 
@@ -45,9 +69,11 @@ pub struct LoginUser {
     pub name: String,
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 impl Session {
-    pub fn parse_sig_str(s: &str) -> Option<Session> {
-        let state: SessionSig = serde_json::from_str(s).ok()?;
+    pub async fn parse_sig_str(s: &str) -> Option<Session> {
+        let s = load_session_file(s).await?;
+        let state: SessionSig = serde_json::from_str(&s).ok()?;
         if state.expire_ts <= current_ts() {
             return None
         }
@@ -58,18 +84,21 @@ impl Session {
         Some(content)
     }
 
-    pub fn generate_sig_str(&self) -> String {
+    pub async fn generate_sig_str(&self) -> String {
         let buf: [u8; 8] = rand::thread_rng().gen();
         let unique_salt = format!("{:x?}", buf);
         let expire_ts = current_ts() + SESSION_TIMEOUT;
         let content_json = serde_json::to_string(self).unwrap();
         let sig = hash_pwd(&unique_salt, expire_ts, &content_json);
-        serde_json::to_string(&SessionSig {
+        let c = serde_json::to_string(&SessionSig {
             unique_salt,
             expire_ts,
             sig,
             content_json,
-        }).unwrap()
+        }).unwrap();
+        let id = format!("{}", uuid::Uuid::new_v4());
+        save_session_file(&id, &c).await;
+        id
     }
 
     pub(crate) fn update(&mut self) {
