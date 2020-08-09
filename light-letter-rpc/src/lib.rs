@@ -1,6 +1,7 @@
 #[macro_use] extern crate log;
 #[macro_use] extern crate lazy_static;
 #[macro_use] extern crate validator_derive;
+#[macro_use] extern crate num_derive;
 #[cfg(not(target_arch = "wasm32"))]
 #[macro_use] extern crate diesel;
 #[cfg(not(target_arch = "wasm32"))]

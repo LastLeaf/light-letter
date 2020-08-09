@@ -19,10 +19,12 @@ validator = "0.10"
 validator_derive = "0.10"
 rand = "0.7"
 uuid = { version = "0.8", features = ["v4"] }
+num-traits = "0.2"
+num-derive = "0.3"
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 tokio = { version = "0.2", features = ["full"] }
-diesel = { version = "1.4", features = ["postgres", "uuid", "r2d2"] }
+diesel = { version = "1.4", features = ["postgres", "uuidv07", "r2d2"] }
 diesel_migrations = "1.4"
 diesel_derives = "1.4"
 chrono = "0.4"

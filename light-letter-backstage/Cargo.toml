@@ -21,6 +21,7 @@ futures = "0.3"
 serde = "1.0"
 serde_json = "1.0"
 serde_urlencoded = "0.6"
+sha2 = "0.8"
 light-letter-rpc = { version = "=0.2.0", path = "../light-letter-rpc" }
 light-letter-web = { version = "=0.2.0", path = "../light-letter-web" }
 light-letter-i18n = { version = "=0.2.0", path = "../light-letter-i18n" }

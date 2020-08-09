@@ -1,8 +1,17 @@
+use sha2::{Sha256, Digest};
 use maomi::prelude::*;
 use light_letter_rpc::backstage::login::*;
 
 use crate::PageMetaData;
 use super::*;
+
+const PWD_SALT: &'static str = "~light~letter";
+
+fn hash_pwd(unique_salt: &str, pwd_str: &str) -> String {
+    let mut s = Sha256::new();
+    s.input((String::new() + unique_salt + pwd_str + PWD_SALT).as_bytes());
+    format!("{:x}", s.result())
+}
 
 #[derive(Default, serde::Serialize, serde::Deserialize)]
 pub struct Query {
@@ -10,23 +19,7 @@ pub struct Query {
 }
 
 template!(xml<B: Backend> for<B> Login<B> ~LOGIN {
-    <HintArea<_> mark="hint">
-        <for login_resp in { &self.hints }>
-            <Hint<_> kind={
-                match login_resp {
-                    LoginResp::Success => hint::HintKind::Common,
-                    _ => hint::HintKind::Error,
-                }
-            } msg={
-                match login_resp {
-                    LoginResp::Success => "Success",
-                    LoginResp::IdIllegal => "The account name is not legal",
-                    LoginResp::NoSuchAccount => "The account does not exists",
-                    LoginResp::WrongPassword => "The account and the password does not match",
-                }
-            } />
-        </for>
-    </HintArea>
+    <HintArea<_> mark="hint" />
     <div<_>
         @tap={|mut s, _| { s.is_register = false; s.ctx.update() } }
     >
@@ -91,7 +84,6 @@ pub struct Login<B: Backend> {
     pwd: String,
     pwd2: String,
     email: String,
-    hints: Vec<LoginResp>,
 }
 
 impl<B: Backend> Component<B> for Login<B> {
@@ -103,7 +95,6 @@ impl<B: Backend> Component<B> for Login<B> {
             pwd: String::new(),
             pwd2: String::new(),
             email: String::new(),
-            hints: vec![],
         }
     }
 }
@@ -125,10 +116,12 @@ impl<B: Backend> PrerenderableComponent<B> for Login<B> {
 }
 
 impl<B: Backend> Login<B> {
+    component_common!();
+
     fn login(&mut self) {
         let req = LoginReq {
             account: self.account.clone(),
-            pwd: self.pwd.clone(),
+            pwd: hash_pwd(&self.account.to_lowercase(), &self.pwd),
         };
         self.ctx.tick_with_component_rc(|this| {
             crate::run_client_async(async move {
@@ -137,7 +130,13 @@ impl<B: Backend> Login<B> {
                     Ok(resp) => {
                         let resp: LoginResp = resp;
                         let mut this = this.borrow_mut();
-                        this.hints.push(resp.clone());
+                        let (k, m) = match resp {
+                            LoginResp::Success => (HintKind::Info, tr!("login-success")),
+                            LoginResp::IdIllegal => (HintKind::Error, tr!("username-illegal")),
+                            LoginResp::NoSuchAccount => (HintKind::Error, tr!("user-not-exists")),
+                            LoginResp::WrongPassword => (HintKind::Error, tr!("wrong-password")),
+                        };
+                        Self::hint(&mut this, k, m);
                         this.ctx.update();
                         if let LoginResp::Success = resp {
                             let query: home::Query = Default::default();
@@ -156,7 +155,7 @@ impl<B: Backend> Login<B> {
         let req = RegisterReq {
             account: self.account.clone(),
             name: self.account.clone(),
-            pwd: self.pwd.clone(),
+            pwd: hash_pwd(&self.account.to_lowercase(), &self.pwd),
             email: self.email.clone(),
         };
         self.ctx.tick_with_component_rc(|this| {
@@ -166,7 +165,13 @@ impl<B: Backend> Login<B> {
                     Ok(resp) => {
                         let resp: RegisterResp = resp;
                         let mut this = this.borrow_mut();
-                        // this.hints.push(resp.clone());
+                        let (k, m) = match resp {
+                            RegisterResp::Success => (HintKind::Info, tr!("registration-success")),
+                            RegisterResp::IdIllegal => (HintKind::Error, tr!("username-illegal")),
+                            RegisterResp::IdUsed => (HintKind::Error, tr!("user-already-exists")),
+                            RegisterResp::Denied => (HintKind::Error, tr!("registration-denied")),
+                        };
+                        Self::hint(&mut this, k, m);
                         this.ctx.update();
                         if let RegisterResp::Success = resp {
                             let query = login::Query {
