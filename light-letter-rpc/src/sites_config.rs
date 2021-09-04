@@ -59,7 +59,7 @@ pub fn read_sites_config(sites_root: &Path) -> SitesConfig {
         panic!(r#"No config.toml found in "{}"."#, sites_root.to_str().unwrap_or_default())
     });
     let config: SitesConfig = toml::from_str(&config_str).unwrap_or_else(|e| {
-        panic!(format!("{}", e))
+        panic!("{}", e)
     });
     *SECURE_RANDOM_STRING_ARC.lock().unwrap() = config.resource.secure_random_string.clone().unwrap_or_default();
     config

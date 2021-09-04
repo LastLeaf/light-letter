@@ -8,7 +8,7 @@ pub use light_letter_web::request::{client_request_channel, RequestChannel, Requ
 mod components;
 pub mod not_found;
 mod backstage;
-#[allow(dead_code)] use routes::{route_to, redirect_to};
+#[allow(unused_imports)] use routes::{route_to, redirect_to};
 pub use routes::{prerender_maomi_component};
 pub use stylesheets::get_css_str;
 

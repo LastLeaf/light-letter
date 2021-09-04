@@ -30,6 +30,7 @@ theme!(Theme);
 routes! {
     not_found::NotFound,
     "/" => pages::index::Index<_>;
+    "/about" => pages::index::About<_>;
 }
 
 stylesheets! {

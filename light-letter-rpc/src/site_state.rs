@@ -30,7 +30,7 @@ impl SiteState {
                 static ref NAME_RE: Regex = Regex::new(r#"^[-_0-9a-zA-Z]+$"#).unwrap();
             }
             if !NAME_RE.is_match(site_config.name.as_str()) {
-                panic!(format!(r#"Illegal site name "{}" (site name should only contains letters, numbers, dashes, and underlines)."#, site_config.name))
+                panic!(r#"Illegal site name "{}" (site name should only contains letters, numbers, dashes, and underlines)."#, site_config.name)
             }
 
             // create dir structure
@@ -44,7 +44,7 @@ impl SiteState {
                 "static" => {
                     fs_extra::dir::create_all(dir.join("static").as_path(), false).unwrap();
                 },
-                _ => panic!(format!(r#"Unrecognized site type "{}"."#, &site_type))
+                _ => panic!(r#"Unrecognized site type "{}"."#, &site_type)
             };
 
             // find theme dir

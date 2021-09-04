@@ -10,10 +10,10 @@ template!(xml<B: Backend> for<B> TextInput<B> ~COMPONENTS {
         class="input"
         value={ &self.value }
         placeholder={ &self.placeholder }
-        @key_up={ |mut s, _| {
-            let text = s.marked_native_node("input").unwrap().borrow_mut_with(&mut s).backend_element().get_field("value").and_then(|x| x.as_string());
-            s.update.new_event().trigger(s, &text.unwrap_or_default());
-        } }
+        // @key_up={ |mut s, _| {
+        //     let text = s.marked_native_node("input").unwrap().borrow_mut_with(&mut s).backend_element().get_field("value").and_then(|x| x.as_string());
+        //     s.update.new_event().trigger(s, &text.unwrap_or_default());
+        // } }
     ></input>
 });
 pub struct TextInput<B: Backend> {

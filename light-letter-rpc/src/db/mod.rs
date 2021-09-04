@@ -57,7 +57,7 @@ impl Db {
                         static ref DB_NAME_RE: Regex = Regex::new(r#"^[_a-zA-Z][_a-zA-Z0-9]*$"#).unwrap();
                     }
                     if !DB_NAME_RE.is_match(db_name) {
-                        panic!(format!(r#"Illegal database name "{}" (database name should be ident-compatible)."#, db_name))
+                        panic!(r#"Illegal database name "{}" (database name should be ident-compatible)."#, db_name)
                     }
 
                     // try create database
@@ -69,7 +69,7 @@ impl Db {
                         db_config.password.as_str(),
                     );
                     let conn = PgConnection::establish(u.as_str()).unwrap_or_else(|e| {
-                        panic!(format!("Cannot connect to database server ({})", e))
+                        panic!("Cannot connect to database server ({})", e)
                     });
                     match diesel::sql_query(format!("SELECT datname FROM pg_database WHERE datname = '{}'", db_name)).load(&conn) {
                         Ok(r) => {
@@ -81,7 +81,7 @@ impl Db {
                                         debug!(r#"Database "{}" created for site "{}""#, db_name, site_config.name);
                                     },
                                     Err(e) => {
-                                        panic!(format!("Cannot create database ({})", e))
+                                        panic!("Cannot create database ({})", e)
                                     }
                                 }
                             } else {
@@ -105,10 +105,10 @@ impl Db {
                                 db_config.password.as_str(),
                             );
                             let conn = PgConnection::establish(u.as_str()).unwrap_or_else(|e| {
-                                panic!(format!("Cannot connect to database ({})", e))
+                                panic!("Cannot connect to database ({})", e)
                             });
                             embedded_migrations::run(&conn).unwrap_or_else(|e| {
-                                panic!(format!("Cannot update database structure ({})", e))
+                                panic!("Cannot update database structure ({})", e)
                             });
 
                             // init connection pool

@@ -10,7 +10,10 @@ pub struct Query {
 
 template!(xml for NotFound {
     <div>
-        "Not Found"
+        "页面未找到"
+    </div>
+    <div>
+        <a href="/"> "回首页" </a>
     </div>
 });
 pub struct NotFound { }
@@ -25,7 +28,7 @@ impl<B: Backend> PrerenderableComponent<B> for NotFound {
     type MetaData = PageMetaData;
     fn get_prerendered_data(&self, _args: Self::Args) -> std::pin::Pin<Box<dyn futures::Future<Output = (Self::PrerenderedData, Self::MetaData)>>> {
         let meta_data = PageMetaData {
-            title: "Not Found".into(),
+            title: "页面未找到".into(),
         };
         let prerendered_data = ();
         Box::pin(futures::future::ready((prerendered_data, meta_data)))

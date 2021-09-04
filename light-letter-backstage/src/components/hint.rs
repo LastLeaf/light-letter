@@ -24,9 +24,9 @@ template!(xml<B: Backend> for<B> HintArea<B> ~COMPONENTS {
                         HintKind::Common => "hint hint-common",
                     }
                 }
-                @tap={ move |mut s, _| {
-                    s.remove(index);
-                } }
+                // @tap={ move |mut s, _| {
+                //     s.remove(index);
+                // } }
             >
                 { &item.1 }
             </div>

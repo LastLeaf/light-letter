@@ -1,6 +1,6 @@
 [package]
 name = "light-letter-theme-ivy-leaf"
-version = "0.2.0"
+version = "0.3.0"
 authors = ["LastLeaf <bqfu@163.com>"]
 edition = "2018"
 
@@ -8,7 +8,7 @@ edition = "2018"
 crate-type = ["cdylib"]
 
 [dependencies]
-maomi = { version = "=0.2.0", path = "../../maomi/maomi" }
+maomi = { version = "0.3", path = "../../maomi/maomi" }
 wasm-bindgen = "0.2"
 console_error_panic_hook = "0.1"
 log = "0.4"
@@ -17,8 +17,8 @@ futures = "0.3"
 serde = "1.0"
 serde_json = "1.0"
 serde_urlencoded = "0.6"
-light-letter-rpc = { version = "=0.2.0", path = "../light-letter-rpc" }
-light-letter-web = { version = "=0.2.0", path = "../light-letter-web" }
+light-letter-rpc = { version = "0.3", path = "../light-letter-rpc" }
+light-letter-web = { version = "0.3", path = "../light-letter-web" }
 
 [dependencies.web-sys]
 version = "0.3"

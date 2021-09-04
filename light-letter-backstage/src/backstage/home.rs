@@ -21,9 +21,9 @@ template!(xml<B: Backend> for<B> Home<B> ~HOME {
             <div class="section-title"> { tr!("recent-posts") } </div>
             <for item in { &self.post_list }>
                 <div>
-                    <a href="javascript:;" @tap={ move |_, _| crate::route_to(&format!("/backstage/post/{}", item.id), "") }>
-                        { item.title }
-                    </a>
+                    // <a href="javascript:;" @tap={ move |_, _| crate::route_to(&format!("/backstage/post/{}", item.id), "") }>
+                    //     { item.title }
+                    // </a>
                 </div>
             </for>
         </div>
@@ -87,7 +87,7 @@ impl<B: Backend> Home<B> {
     component_common!();
 
     fn load_post_list(&self, skip: usize) {
-        self.ctx.tick_with_component_rc(|this| {
+        self.ctx.tick_with_component_rc(move |this| {
             crate::run_client_async(async move {
                 let req = PostListReq {
                     skip,

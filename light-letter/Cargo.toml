@@ -1,6 +1,6 @@
 [package]
 name = "light-letter"
-version = "0.2.0"
+version = "0.3.0"
 authors = ["LastLeaf <bqfu@163.com>"]
 edition = "2018"
 
@@ -34,13 +34,9 @@ rand = "0.7"
 cookie = { version = "0.14", features = ["percent-encode"] }
 time = "0.2"
 libloading = "0.6"
-maomi = { version = "=0.2.0", path = "../../maomi/maomi" }
-light-letter-rpc = { version = "=0.2.0", path = "../light-letter-rpc" }
-light-letter-web = { version = "=0.2.0", path = "../light-letter-web" }
+maomi = { version = "0.3", path = "../../maomi/maomi" }
+light-letter-rpc = { version = "0.3", path = "../light-letter-rpc" }
+light-letter-web = { version = "0.3", path = "../light-letter-web" }
 
 [dev-dependencies]
 tempdir = "0.3"
-
-[dependencies.light-letter-theme-ivy-leaf]
-version = "=0.2.0"
-path = "../light-letter-theme-ivy-leaf"

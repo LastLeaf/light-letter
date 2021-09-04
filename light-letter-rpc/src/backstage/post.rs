@@ -32,6 +32,7 @@ pub enum PostListFilter {
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
 pub enum PostListResp {
     Success(Vec<PostMeta>),
+    Fail,
 }
 
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
@@ -55,7 +56,7 @@ pub enum PostStatus {
 }
 
 #[cfg(not(target_arch = "wasm32"))]
-pub async fn list(site_state: &'static SiteState, req: PostListReq, session: &mut Session) -> Result<PostListResp, RpcError> {
+pub async fn list(site_state: &'static SiteState, req: PostListReq, _session: &mut Session) -> Result<PostListResp, RpcError> {
     req.validate().map_err(|x| RpcError::IllegalArgs(x.to_string()))?;
     let db = site_state.db()?;
     // TODO impl filters

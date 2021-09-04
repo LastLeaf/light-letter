@@ -1,9 +1,12 @@
 # light-letter
 
+A blog-like website engine.
+
+**Still in early development. Do not use it in productional stage.**
+
 ## Installation
 
 1. Install rust toolchain installer [website](https://rustup.rs/)
-1. Install latest rust stable `rustup install stable`
 1. Install PostgreSQL `apt install postgresql libpq-dev` (debian like systems)
 1. Login into PostgreSQL `sudo -u postgres psql`
   1. Create a new user `CREATE USER light_letter;`

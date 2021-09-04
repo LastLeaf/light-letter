@@ -6,7 +6,7 @@ template!(xml<B: Backend> for<B> Button<B> ~COMPONENTS {
     <div
         class="button"
         @tap={ |s, _| {
-            s.press.new_event().trigger(s, &());
+            // s.press.new_event().trigger(s, &());
         } }
     >
         <slot />
