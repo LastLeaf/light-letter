@@ -7,7 +7,7 @@ A blog-like website engine.
 ## Installation
 
 1. Install rust toolchain installer [website](https://rustup.rs/)
-1. Install PostgreSQL `apt install postgresql libpq-dev` (debian like systems)
+1. Install PostgreSQL `sudo apt install postgresql libpq-dev` (debian like systems)
 1. Login into PostgreSQL `sudo -u postgres psql`
   1. Create a new user `CREATE USER light_letter;`
   1. Allow new user to create database `ALTER USER light_letter CREATEDB;`

@@ -116,7 +116,7 @@ skin!(INDEX = r#"
         color: #666;
         margin: 0 auto;
         line-height: 1.5;
-        padding: 20px 0;
+        padding: 20px;
     }
     .post-title {
         font-size: 1.5em;
